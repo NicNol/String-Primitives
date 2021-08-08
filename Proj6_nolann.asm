@@ -227,6 +227,9 @@ _addInteger:
 	imul			EDX								; Result is stored in EDX:EAX
 	add				EBX, EAX
 
+	; Jump to error if overflow
+	jo				_overflowError
+
 	; Set up next cycle
 	pop				EDX
 	mov				EAX, EDX
@@ -252,6 +255,12 @@ _multiplyBySignFlag:
 	mov				[EDI], EAX
 
 	jmp				_endRead
+
+_overflowError:
+
+	; Fix stack and then use _inputLengthError to set flag
+	pop				EDX
+	jmp				_inputLengthError
 
 _inputLengthError:
 
@@ -344,25 +353,28 @@ WriteVal PROC
 	ret				4
 WriteVal ENDP
 
-printOutput PROC
+printOutput PROC uses EAX EBX ECX EDX ESI
 	push			EBP
 	mov				EBP, ESP
 
 	; Set up registers
 	mov				ECX, INTEGER_COUNT
-	mov				ESI, [EBP + 20]
+	mov				ESI, [EBP + 40]
 
 	; Print Title for entered numbers
 	call			CrLf
-	mDisplayString	[EBP + 8]
+	mDisplayString	[EBP + 28]
 
 _printNumber:
-	mov				EAX, 0
+
+	; Move next index value into EAX
 	LODSD
 
+	; Write number value as a string
 	push			EAX
 	call			WriteVal
 
+	; Unless we're on the last number, print a comma and a space between numbers
 	cmp				ECX, 1
 	je				_calculateSum
 
@@ -376,7 +388,7 @@ _calculateSum:
 
 	; Set up registers
 	mov				ECX, INTEGER_COUNT
-	mov				ESI, [EBP + 20]
+	mov				ESI, [EBP + 40]
 	mov				EBX, 0								; Store Sum
 _sumNext:
 
@@ -388,7 +400,7 @@ _sumNext:
 	; Display Sum Title
 	call			CrLf
 	call			CrLf
-	mDisplayString	[EBP + 12]
+	mDisplayString	[EBP + 32]
 
 	; Display Sum
 	mov				EAX, EBX
@@ -397,6 +409,7 @@ _sumNext:
 
 _calculateAverage:
 
+	; Divide Sum by number of intergers entered by the user
 	mov				EBX, INTEGER_COUNT
 	cdq
 	idiv			EBX									; Quotient = EAX. Remainder = EDX.
@@ -404,7 +417,7 @@ _calculateAverage:
 	; Display Average Title
 	call			CrLf
 	call			CrLf
-	mDisplayString	[EBP + 16]
+	mDisplayString	[EBP + 36]
 
 	; Display Average
 	push			EAX
