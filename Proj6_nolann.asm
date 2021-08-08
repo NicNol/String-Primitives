@@ -133,7 +133,9 @@ _inputErrorMessageEnd:
 	call			printOutput
 
 	; Say goodbye
-	mDisplayString offset goodbye
+	call			CrLf
+	call			CrLf
+	mDisplayString	offset goodbye
 
 	Invoke ExitProcess,0	; exit to operating system
 main ENDP
@@ -335,8 +337,11 @@ WriteVal PROC
 	push			EBP
 	mov				EBP, ESP
 
+	mov				EAX, [EBP + 8]
+	call			WriteInt
+
 	pop				EBP
-	ret		
+	ret				4
 WriteVal ENDP
 
 printOutput PROC
@@ -348,17 +353,62 @@ printOutput PROC
 	mov				ESI, [EBP + 20]
 
 	; Print Title for entered numbers
+	call			CrLf
 	mDisplayString	[EBP + 8]
 
 _printNumber:
 	mov				EAX, 0
 	LODSD
-	call			WriteInt
+
+	push			EAX
+	call			WriteVal
+
+	cmp				ECX, 1
+	je				_calculateSum
+
 	mov				AL, ','
 	call			WriteChar
 	mov				AL, ' '
 	call			WriteChar
 	loop			_printNumber
+
+_calculateSum:
+
+	; Set up registers
+	mov				ECX, INTEGER_COUNT
+	mov				ESI, [EBP + 20]
+	mov				EBX, 0								; Store Sum
+_sumNext:
+
+	; Load next array value into EAX
+	LODSD
+	add				EBX, EAX
+	loop			_sumNext
+
+	; Display Sum Title
+	call			CrLf
+	call			CrLf
+	mDisplayString	[EBP + 12]
+
+	; Display Sum
+	mov				EAX, EBX
+	push			EAX
+	call			WriteVal
+
+_calculateAverage:
+
+	mov				EBX, INTEGER_COUNT
+	cdq
+	idiv			EBX									; Quotient = EAX. Remainder = EDX.
+
+	; Display Average Title
+	call			CrLf
+	call			CrLf
+	mDisplayString	[EBP + 16]
+
+	; Display Average
+	push			EAX
+	call			WriteVal
 
 	pop				EBP
 	ret				16
