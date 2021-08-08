@@ -1,4 +1,4 @@
-Microsoft (R) Macro Assembler Version 14.29.30040.0	    08/08/21 11:03:06
+Microsoft (R) Macro Assembler Version 14.29.30040.0	    08/08/21 13:24:24
 <Project 6 - String Primitives and Macros     (Proj6_nolann.  Page 1 - 1
 
 
@@ -68,8 +68,8 @@ Microsoft (R) Macro Assembler Version 14.29.30040.0	    08/08/21 11:03:06
 				ENDM
 
 				; Constants
- = 0000000A			INTEGER_COUNT = 10
- = 00000064			MAX_INPUT_LENGTH = 100
+ = 00000003			INTEGER_COUNT = 3
+ = 0000000F			MAX_INPUT_LENGTH = 15
 
  00000000			.data
 
@@ -162,27 +162,30 @@ Microsoft (R) Macro Assembler Version 14.29.30040.0	    08/08/21 11:03:06
 	   0D 0A 00
 
 				; Input Identifiers
- 00000180  00000064 [		userInput			BYTE	MAX_INPUT_LENGTH DUP(?)
+ 00000180  0000000F [		userInput			BYTE	MAX_INPUT_LENGTH DUP(?)
 	    00
 	   ]
- 000001E4 00000000		inputLength			DWORD	0
- 000001E8 00000000		inputErrorFlag		DWORD	0
- 000001EC 00000001		inputSign			SDWORD	1
+ 0000018F 00000000		inputLength			DWORD	0
+ 00000193 00000000		inputErrorFlag		DWORD	0
+ 00000197 00000001		inputSign			SDWORD	1
+ 0000019B  00000003 [		inputArray			SDWORD	INTEGER_COUNT DUP(?)
+	    00000000
+	   ]
 
 				; Output String Identifiers
- 000001F0 59 6F 75 20 65	outputNumbers		BYTE	"You entered these numbers:", 13, 10, 0
+ 000001A7 59 6F 75 20 65	outputNumbers		BYTE	"You entered these numbers:", 13, 10, 0
 	   6E 74 65 72 65
 	   64 20 74 68 65
 	   73 65 20 6E 75
 	   6D 62 65 72 73
 	   3A 0D 0A 00
- 0000020D 54 68 65 20 73	outputSum			BYTE	"The sum of the numbers is: ", 0
+ 000001C4 54 68 65 20 73	outputSum			BYTE	"The sum of the numbers is: ", 0
 	   75 6D 20 6F 66
 	   20 74 68 65 20
 	   6E 75 6D 62 65
 	   72 73 20 69 73
 	   3A 20 00
- 00000229 54 68 65 20 72	outputAverage		BYTE	"The rounded average of all the numbers is: ", 0
+ 000001E0 54 68 65 20 72	outputAverage		BYTE	"The rounded average of all the numbers is: ", 0
 	   6F 75 6E 64 65
 	   64 20 61 76 65
 	   72 61 67 65 20
@@ -193,7 +196,7 @@ Microsoft (R) Macro Assembler Version 14.29.30040.0	    08/08/21 11:03:06
 	   73 3A 20 00
 
 				; Goodbye Identifiers
- 00000255 54 68 61 6E 6B	goodbye				BYTE	"Thank you for using my program. Hasta Luego!", 13, 10, 0
+ 0000020C 54 68 61 6E 6B	goodbye				BYTE	"Thank you for using my program. Hasta Luego!", 13, 10, 0
 	   20 79 6F 75 20
 	   66 6F 72 20 75
 	   73 69 6E 67 20
@@ -208,293 +211,340 @@ Microsoft (R) Macro Assembler Version 14.29.30040.0	    08/08/21 11:03:06
  00000000			main PROC
 					
 					; Print Introduction
- 00000000  68 0000002B R		push			offset programByline
- 00000005  68 00000000 R		push			offset programTitle
- 0000000A  E8 00000144			call			printIntroduction
+					mDisplayString	offset programTitle
+ 00000000  52		     1		push	EDX
+ 00000001  BA 00000000 R     1		mov		EDX, offset programTitle
+ 00000006  E8 00000000 E     1		call	WriteString
+ 0000000B  5A		     1		pop		EDX
+					mDisplayString	offset programByline
+ 0000000C  52		     1		push	EDX
+ 0000000D  BA 0000002B R     1		mov		EDX, offset programByline
+ 00000012  E8 00000000 E     1		call	WriteString
+ 00000017  5A		     1		pop		EDX
 
 					; Print Instructions
- 0000000F  68 0000003C R		push			offset instruction1
- 00000014  E8 00000157			call			printInstructions
+					mDisplayString	offset instruction1
+ 00000018  52		     1		push	EDX
+ 00000019  BA 0000003C R     1		mov		EDX, offset instruction1
+ 0000001E  E8 00000000 E     1		call	WriteString
+ 00000023  5A		     1		pop		EDX
 
-					; Get the required number of user inputs
- 00000019  B9 0000000A			mov				ECX, INTEGER_COUNT
+					; Set up our looping registers
+ 00000024  B9 00000003			mov				ECX, INTEGER_COUNT
+ 00000029  BF 0000019B R		mov				EDI, offset inputArray
 
- 0000001E			_getUserInput:
+ 0000002E			_getUserInput:
 					
 					; Solicit user input of signed integers
- 0000001E  68 000001EC R		push			offset inputSign
- 00000023  68 000001E8 R		push			offset inputErrorFlag
- 00000028  68 000001E4 R		push			offset inputLength
- 0000002D  68 00000180 R		push			offset userInput
- 00000032  68 00000130 R		push			offset inputRequest
- 00000037  E8 00000038			call			ReadVal
+ 0000002E  57				push			EDI
+ 0000002F  68 00000197 R		push			offset inputSign
+ 00000034  68 00000193 R		push			offset inputErrorFlag
+ 00000039  68 0000018F R		push			offset inputLength
+ 0000003E  68 00000180 R		push			offset userInput
+ 00000043  68 00000130 R		push			offset inputRequest
+ 00000048  E8 00000054			call			ReadVal
 
 					; If invalid input, print error and retry
- 0000003C  83 3D 000001E8 R		cmp				inputErrorFlag, 0
+ 0000004D  83 3D 00000193 R		cmp				inputErrorFlag, 0
 	   00
- 00000043  75 02			jne				_inputErrorMessage
- 00000045  EB 18			jmp				_inputErrorMessageEnd
+ 00000054  75 02			jne				_inputErrorMessage
+ 00000056  EB 18			jmp				_inputErrorMessageEnd
 
- 00000047			_inputErrorMessage:
+ 00000058			_inputErrorMessage:
 
 					mDisplayString	offset inputErrorMsg
- 00000047  52		     1		push	EDX
- 00000048  BA 00000150 R     1		mov		EDX, offset inputErrorMsg
- 0000004D  E8 00000000 E     1		call	WriteString
- 00000052  5A		     1		pop		EDX
- 00000053  C7 05 000001E8 R		mov				inputErrorFlag, 0
+ 00000058  52		     1		push	EDX
+ 00000059  BA 00000150 R     1		mov		EDX, offset inputErrorMsg
+ 0000005E  E8 00000000 E     1		call	WriteString
+ 00000063  5A		     1		pop		EDX
+ 00000064  C7 05 00000193 R		mov				inputErrorFlag, 0
 	   00000000
- 0000005D  EB BF			jmp				_getUserInput
+ 0000006E  EB BE			jmp				_getUserInput
 
- 0000005F			_inputErrorMessageEnd:
+ 00000070			_inputErrorMessageEnd:
 
- 0000005F  E2 BD			loop			_getUserInput
+					; Move EDI pointer to next array index
+ 00000070  83 C7 04			add				EDI, type SDWORD				
 
-					; Convert inputs to SDWORD Array
+ 00000073  E2 B9			loop			_getUserInput
 
 					; Display output (numbers, sum, and rounded average)
+ 00000075  68 0000019B R		push			offset inputArray
+ 0000007A  68 000001E0 R		push			offset outputAverage
+ 0000007F  68 000001C4 R		push			offset outputSum
+ 00000084  68 000001A7 R		push			offset outputNumbers
+ 00000089  E8 0000014E			call			printOutput
 
 					; Say goodbye
 					mDisplayString offset goodbye
- 00000061  52		     1		push	EDX
- 00000062  BA 00000255 R     1		mov		EDX, offset goodbye
- 00000067  E8 00000000 E     1		call	WriteString
- 0000006C  5A		     1		pop		EDX
+ 0000008E  52		     1		push	EDX
+ 0000008F  BA 0000020C R     1		mov		EDX, offset goodbye
+ 00000094  E8 00000000 E     1		call	WriteString
+ 00000099  5A		     1		pop		EDX
 
 					Invoke ExitProcess,0	; exit to operating system
- 0000006D  6A 00	   *	    push   +000000000h
- 0000006F  E8 00000000 E   *	    call   ExitProcess
- 00000074			main ENDP
+ 0000009A  6A 00	   *	    push   +000000000h
+ 0000009C  E8 00000000 E   *	    call   ExitProcess
+ 000000A1			main ENDP
 
- 00000074			ReadVal PROC uses EAX ECX EDX ESI
- 00000074  50		   *	    push   eax
- 00000075  51		   *	    push   ecx
- 00000076  52		   *	    push   edx
- 00000077  56		   *	    push   esi
- 00000078  55				push			EBP
- 00000079  8B EC			mov				EBP, ESP
+ 000000A1			ReadVal PROC uses EAX EBX ECX EDX ESI EDI
+ 000000A1  50		   *	    push   eax
+ 000000A2  53		   *	    push   ebx
+ 000000A3  51		   *	    push   ecx
+ 000000A4  52		   *	    push   edx
+ 000000A5  56		   *	    push   esi
+ 000000A6  57		   *	    push   edi
+ 000000A7  55				push			EBP
+ 000000A8  8B EC			mov				EBP, ESP
 
 					; Invoke the mGetString macro to get user input in the form of a string of digits
-					mGetString		[EBP + 24], [EBP + 28], MAX_INPUT_LENGTH, [EBP + 32]		; Parameters: inputPrompt, inputString, inputLengthLimit, InputLength
- 0000007B  50		     1		push	EAX
- 0000007C  51		     1		push	ECX
- 0000007D  52		     1		push	EDX
- 0000007E  52		     2		push	EDX
- 0000007F  8B 55 18	     2		mov		EDX, [EBP + 24]
- 00000082  E8 00000000 E     2		call	WriteString
- 00000087  5A		     2		pop		EDX
- 00000088  8B 55 1C	     1		mov		EDX, [EBP + 28]
- 0000008B  B9 00000064	     1		mov		ECX, MAX_INPUT_LENGTH
- 00000090  E8 00000000 E     1		call	ReadString						; Returns: EAX = Number of characters entered.
- 00000095  89 45 20	     1		mov		[EBP + 32], EAX
- 00000098  5A		     1		pop		EDX
- 00000099  59		     1		pop		ECX
- 0000009A  58		     1		pop		EAX
+					mGetString		[EBP + 32], [EBP + 36], MAX_INPUT_LENGTH, [EBP + 40]		; Parameters: inputPrompt, inputString, inputLengthLimit, InputLength
+ 000000AA  50		     1		push	EAX
+ 000000AB  51		     1		push	ECX
+ 000000AC  52		     1		push	EDX
+ 000000AD  52		     2		push	EDX
+ 000000AE  8B 55 20	     2		mov		EDX, [EBP + 32]
+ 000000B1  E8 00000000 E     2		call	WriteString
+ 000000B6  5A		     2		pop		EDX
+ 000000B7  8B 55 24	     1		mov		EDX, [EBP + 36]
+ 000000BA  B9 0000000F	     1		mov		ECX, MAX_INPUT_LENGTH
+ 000000BF  E8 00000000 E     1		call	ReadString						; Returns: EAX = Number of characters entered.
+ 000000C4  89 45 28	     1		mov		[EBP + 40], EAX
+ 000000C7  5A		     1		pop		EDX
+ 000000C8  59		     1		pop		ECX
+ 000000C9  58		     1		pop		EAX
 
 					; Set up looping registers
- 0000009B  8B 75 1C			mov				ESI, [EBP + 28]
- 0000009E  8B 4D 20			mov				ECX, [EBP + 32]
+ 000000CA  8B 75 24			mov				ESI, [EBP + 36]
+ 000000CD  8B 4D 28			mov				ECX, [EBP + 40]
 
 					; If no input or input too long, then raise error.
- 000000A1  83 F9 00			cmp				ECX, 0
- 000000A4  7E 3E			jle				_inputLengthError
- 000000A6  83 F9 0C			cmp				ECX, 12
- 000000A9  7D 39			jge				_inputLengthError
+ 000000D0  83 F9 00			cmp				ECX, 0
+ 000000D3  0F 8E 00000095		jle				_inputLengthError
+ 000000D9  83 F9 0C			cmp				ECX, 12
+ 000000DC  0F 8D 0000008C		jge				_inputLengthError
+
+					; Reset EAX and load first ASCII character
+ 000000E2  B8 00000000			mov				EAX, 0
+ 000000E7  FC				cld
+ 000000E8  AC				lodsb
 
 					; Check first character for sign
- 000000AB  B8 00000000			mov				EAX, 0
- 000000B0  FC				cld
- 000000B1  AC				lodsb
- 000000B2  FF 75 28			push			[EBP + 40]								; inputSign offset
- 000000B5  FF 75 24			push			[EBP + 36]								; inputErrorFlag offset
- 000000B8  50				push			EAX
- 000000B9  E8 00000037			call			validateFirstCharacter
+ 000000E9  FF 75 30			push			[EBP + 48]								; inputSign offset
+ 000000EC  FF 75 2C			push			[EBP + 44]								; inputErrorFlag offset
+ 000000EF  50				push			EAX
+ 000000F0  E8 0000008E			call			validateFirstCharacter
 					
 					; Decrement ECX and verify it is greater than zero before checking next characters
- 000000BE  49				dec				ECX
- 000000BF  83 F9 00			cmp				ECX, 0
- 000000C2  7E 29			jle				_endRead
+ 000000F5  49				dec				ECX
+ 000000F6  83 F9 00			cmp				ECX, 0
+ 000000F9  7E 1E			jle				_saveToArray
 
- 000000C4			_nextCharacter:
+ 000000FB			_nextCharacter:
 
 					; Reset EAX and load next ASCII character
- 000000C4  B8 00000000			mov				EAX, 0
- 000000C9  FC				cld
- 000000CA  AC				lodsb													; load string byte into AL
+ 000000FB  B8 00000000			mov				EAX, 0
+ 00000100  FC				cld
+ 00000101  AC				lodsb													; load string byte into AL
 
 					; Validate ASCII character
- 000000CB  FF 75 24			push			[EBP + 36]								; inputError offset
- 000000CE  50				push			EAX
- 000000CF  E8 00000056			call			validateCharacter
+ 00000102  FF 75 2C			push			[EBP + 44]								; inputError offset
+ 00000105  50				push			EAX
+ 00000106  E8 000000AD			call			validateCharacter
 					
 					; If character was invalid, break loop
- 000000D4  B8 00000000			mov				EAX, 0
- 000000D9  8B 55 24			mov				EDX, [EBP + 36]
- 000000DC  3B 02			cmp				EAX, [EDX]
- 000000DE  75 0D			jne				_endRead
+ 0000010B  B8 00000000			mov				EAX, 0
+ 00000110  8B 55 2C			mov				EDX, [EBP + 44]
+ 00000113  3B 02			cmp				EAX, [EDX]
+ 00000115  75 62			jne				_endRead
 
- 000000E0  E2 E2			loop			_nextCharacter
-					
-					; Store the value into a memory variable
-					
- 000000E2  EB 09			jmp				_endRead
+ 00000117  E2 E2			loop			_nextCharacter
 
- 000000E4			_inputLengthError:
+ 00000119			_saveToArray:
+
+					; Set up registers
+ 00000119  8B 75 24			mov				ESI, [EBP + 36]					; Address of user input string
+ 0000011C  8B 7D 34			mov				EDI, [EBP + 52]					; Address of array index where result will go
+ 0000011F  8B 4D 28			mov				ECX, [EBP + 40]					; Length of string
+ 00000122  BB 00000000			mov				EBX, 0							; Starting value
+ 00000127  BA 00000001			mov				EDX, 1							; 10s place
+
+					; Set ESI to last character
+ 0000012C  8B C1			mov				EAX, ECX
+ 0000012E  48				dec				EAX
+ 0000012F  03 F0			add				ESI, EAX
+
+ 00000131			_addInteger:
+					; Reset EAX and load next ASCII character
+ 00000131  B8 00000000			mov				EAX, 0
+ 00000136  FD				std
+ 00000137  AC				lodsb
+
+					; If character is a sign, check next character
+ 00000138  83 F8 2B			cmp				EAX, 2Bh		; + sign
+ 0000013B  74 1B			je				_multiplyBySignFlag
+ 0000013D  83 F8 2D			cmp				EAX, 2Dh		; - sign
+ 00000140  74 16			je				_multiplyBySignFlag
+
+					; Convert ASCII to hex integer value
+ 00000142  83 E8 30			sub				EAX, 30h
+
+					; Multiply by 10 ^ n
+ 00000145  52				push			EDX
+ 00000146  F7 EA			imul			EDX								; Result is stored in EDX:EAX
+ 00000148  03 D8			add				EBX, EAX
+
+					; Set up next cycle
+ 0000014A  5A				pop				EDX
+ 0000014B  8B C2			mov				EAX, EDX
+ 0000014D  BA 0000000A			mov				EDX, 10
+ 00000152  F7 EA			imul			EDX
+ 00000154  8B D0			mov				EDX, EAX
+
+ 00000156  E2 D9			loop			_addInteger
+
+ 00000158			_multiplyBySignFlag:
+
+					; Multiply by sign flag
+ 00000158  8B C3			mov				EAX, EBX
+ 0000015A  8B 5D 30			mov				EBX, [EBP + 48]					; sign (1 or -1)
+ 0000015D  8B 1B			mov				EBX, [EBX]
+ 0000015F  F7 EB			imul			EBX								; Result is stored in EDX:EAX
+
+					; Reset sign flag
+ 00000161  8B 5D 30			mov				EBX, [EBP + 48]	
+ 00000164  C7 03 00000001		mov				sdword ptr [EBX], 1
+
+					; Save integer value to array
+ 0000016A  89 07			mov				[EDI], EAX
+
+ 0000016C  EB 0B			jmp				_endRead
+
+ 0000016E			_inputLengthError:
 
 					; Set Error Flag
- 000000E4  8B 45 24			mov				EAX, [EBP + 36]
- 000000E7  C7 00 00000001		mov				DWORD ptr [EAX], 1
+ 0000016E  8B 45 2C			mov				EAX, [EBP + 44]
+ 00000171  C7 00 00000001		mov				DWORD ptr [EAX], 1
+ 00000177  EB 00			jmp				_endRead
 
- 000000ED			_endRead:
+ 00000179			_endRead:
 
- 000000ED  5D				pop				EBP
- 000000EE  5E		   *	    pop    esi
- 000000EF  5A		   *	    pop    edx
- 000000F0  59		   *	    pop    ecx
- 000000F1  58		   *	    pop    eax
- 000000F2  C2 0014			ret				20
- 000000F5			ReadVal ENDP
+ 00000179  5D				pop				EBP
+ 0000017A  5F		   *	    pop    edi
+ 0000017B  5E		   *	    pop    esi
+ 0000017C  5A		   *	    pop    edx
+ 0000017D  59		   *	    pop    ecx
+ 0000017E  5B		   *	    pop    ebx
+ 0000017F  58		   *	    pop    eax
+ 00000180  C2 0018			ret				24
+ 00000183			ReadVal ENDP
 
- 000000F5			validateFirstCharacter PROC
- 000000F5  55				push			EBP
- 000000F6  8B EC			mov				EBP, ESP
-
-					; Move ASCII character to EAX
- 000000F8  8B 45 08			mov				EAX, [EBP + 8]
-
-					; Check if character is a plus or minus sign
- 000000FB  83 F8 2B			cmp				EAX, 2Bh		; + sign
- 000000FE  74 26			je				_errorFirstCharEnd
- 00000100  83 F8 2D			cmp				EAX, 2Dh		; - sign
- 00000103  74 0C			je				_minusSign
-
-					; Check if character is in the range of 30 [0] to 39 [9]
- 00000105  83 F8 30			cmp				EAX, 30h
- 00000108  72 13			jb				_errorFirstChar
- 0000010A  83 F8 39			cmp				EAX, 39h
- 0000010D  77 0E			ja				_errorFirstChar
- 0000010F  EB 15			jmp				_errorFirstCharEnd
-
- 00000111			_minusSign:
-
-					; Store the negative sign
- 00000111  8B 45 10			mov				EAX, [EBP + 16]
- 00000114  BA FFFFFFFF			mov				EDX, -1
- 00000119  89 10			mov				[EAX], EDX
- 0000011B  EB 09			jmp				_errorFirstCharEnd
-
- 0000011D			_errorFirstChar:
-					
- 0000011D  8B 45 0C			mov				EAX, [EBP + 12]
- 00000120  C7 00 00000001		mov				DWORD ptr [EAX], 1		; Set error flag
-
- 00000126			_errorFirstCharEnd:
-
- 00000126  5D				pop				EBP
- 00000127  C2 000C			ret				12
- 0000012A			validateFirstCharacter ENDP
-
- 0000012A			validateCharacter PROC
- 0000012A  55				push			EBP
- 0000012B  8B EC			mov				EBP, ESP
-
-
-					; Move ASCII character to EAX
- 0000012D  8B 45 08			mov				EAX, [EBP + 8]
-
-					; Check if character is in the range of 48 [0] to 57 [9]
- 00000130  83 F8 30			cmp				EAX, 30h
- 00000133  72 07			jb				_error
-
- 00000135  83 F8 39			cmp				EAX, 39h
- 00000138  77 02			ja				_error
-
-					; If character is in range, character is valid
- 0000013A  EB 09			jmp				_errorEnd
-
- 0000013C			_error:
-
- 0000013C  8B 45 0C			mov				EAX, [EBP + 12]
- 0000013F  C7 00 00000001		mov				DWORD ptr [EAX], 1		; Set error flag
-
- 00000145			_errorEnd:
-
- 00000145  5D				pop				EBP
- 00000146  C2 0008			ret				8
- 00000149			validateCharacter ENDP
-
- 00000149			clearString PROC
- 00000149  55				push			EBP
- 0000014A  8B EC			mov				EBP, ESP
-
- 0000014C  5D				pop				EBP
- 0000014D  C3				ret		
- 0000014E			clearString ENDP
-
- 0000014E			WriteVal PROC
- 0000014E  55				push			EBP
- 0000014F  8B EC			mov				EBP, ESP
-
- 00000151  5D				pop				EBP
- 00000152  C3				ret		
- 00000153			WriteVal ENDP
-
- 00000153			printIntroduction PROC uses EDX
- 00000153  52		   *	    push   edx
- 00000154  55				push			EBP
- 00000155  8B EC			mov				EBP, ESP
-
-					; Program Title
-					mDisplayString	[EBP + 12]
- 00000157  52		     1		push	EDX
- 00000158  8B 55 0C	     1		mov		EDX, [EBP + 12]
- 0000015B  E8 00000000 E     1		call	WriteString
- 00000160  5A		     1		pop		EDX
-
-					; Program Author
-					mDisplayString	[EBP + 16]
- 00000161  52		     1		push	EDX
- 00000162  8B 55 10	     1		mov		EDX, [EBP + 16]
- 00000165  E8 00000000 E     1		call	WriteString
- 0000016A  5A		     1		pop		EDX
-
- 0000016B  5D				pop				EBP
- 0000016C  5A		   *	    pop    edx
- 0000016D  C2 0008			ret				8
- 00000170			printIntroduction ENDP
-
- 00000170			printInstructions PROC uses EDX
- 00000170  52		   *	    push   edx
- 00000171  55				push			EBP
- 00000172  8B EC			mov				EBP, ESP
-
-					mDisplayString	[EBP + 12]
- 00000174  52		     1		push	EDX
- 00000175  8B 55 0C	     1		mov		EDX, [EBP + 12]
- 00000178  E8 00000000 E     1		call	WriteString
- 0000017D  5A		     1		pop		EDX
-
- 0000017E  5D				pop				EBP
- 0000017F  5A		   *	    pop    edx
- 00000180  C2 0008			ret				8
- 00000183			printInstructions ENDP
-
- 00000183			printOutput PROC
+ 00000183			validateFirstCharacter PROC
  00000183  55				push			EBP
  00000184  8B EC			mov				EBP, ESP
 
-					mDisplayString	[EBP + 8]
- 00000186  52		     1		push	EDX
- 00000187  8B 55 08	     1		mov		EDX, [EBP + 8]
- 0000018A  E8 00000000 E     1		call	WriteString
- 0000018F  5A		     1		pop		EDX
+					; Move ASCII character to EAX
+ 00000186  8B 45 08			mov				EAX, [EBP + 8]
 
- 00000190  5D				pop				EBP
- 00000191  C2 0008			ret				8
- 00000194			printOutput ENDP
+					; Check if character is a plus or minus sign
+ 00000189  83 F8 2B			cmp				EAX, 2Bh		; + sign
+ 0000018C  74 26			je				_errorFirstCharEnd
+ 0000018E  83 F8 2D			cmp				EAX, 2Dh		; - sign
+ 00000191  74 0C			je				_minusSign
+
+					; Check if character is in the range of 30 [0] to 39 [9]
+ 00000193  83 F8 30			cmp				EAX, 30h
+ 00000196  72 13			jb				_errorFirstChar
+ 00000198  83 F8 39			cmp				EAX, 39h
+ 0000019B  77 0E			ja				_errorFirstChar
+ 0000019D  EB 15			jmp				_errorFirstCharEnd
+
+ 0000019F			_minusSign:
+
+					; Store the negative sign
+ 0000019F  8B 45 10			mov				EAX, [EBP + 16]
+ 000001A2  BA FFFFFFFF			mov				EDX, -1
+ 000001A7  89 10			mov				[EAX], EDX
+ 000001A9  EB 09			jmp				_errorFirstCharEnd
+
+ 000001AB			_errorFirstChar:
+					
+ 000001AB  8B 45 0C			mov				EAX, [EBP + 12]
+ 000001AE  C7 00 00000001		mov				DWORD ptr [EAX], 1		; Set error flag
+
+ 000001B4			_errorFirstCharEnd:
+
+ 000001B4  5D				pop				EBP
+ 000001B5  C2 000C			ret				12
+ 000001B8			validateFirstCharacter ENDP
+
+ 000001B8			validateCharacter PROC
+ 000001B8  55				push			EBP
+ 000001B9  8B EC			mov				EBP, ESP
+
+					; Move ASCII character to EAX
+ 000001BB  8B 45 08			mov				EAX, [EBP + 8]
+
+					; Check if character is in the range of 48 [0] to 57 [9]
+ 000001BE  83 F8 30			cmp				EAX, 30h
+ 000001C1  72 07			jb				_error
+
+ 000001C3  83 F8 39			cmp				EAX, 39h
+ 000001C6  77 02			ja				_error
+
+					; If character is in range, character is valid
+ 000001C8  EB 09			jmp				_errorEnd
+
+ 000001CA			_error:
+
+ 000001CA  8B 45 0C			mov				EAX, [EBP + 12]
+ 000001CD  C7 00 00000001		mov				DWORD ptr [EAX], 1		; Set error flag
+
+ 000001D3			_errorEnd:
+
+ 000001D3  5D				pop				EBP
+ 000001D4  C2 0008			ret				8
+ 000001D7			validateCharacter ENDP
+
+ 000001D7			WriteVal PROC
+ 000001D7  55				push			EBP
+ 000001D8  8B EC			mov				EBP, ESP
+
+ 000001DA  5D				pop				EBP
+ 000001DB  C3				ret		
+ 000001DC			WriteVal ENDP
+
+ 000001DC			printOutput PROC
+ 000001DC  55				push			EBP
+ 000001DD  8B EC			mov				EBP, ESP
+
+					; Set up registers
+ 000001DF  B9 00000003			mov				ECX, INTEGER_COUNT
+ 000001E4  8B 75 14			mov				ESI, [EBP + 20]
+
+					; Print Title for entered numbers
+					mDisplayString	[EBP + 8]
+ 000001E7  52		     1		push	EDX
+ 000001E8  8B 55 08	     1		mov		EDX, [EBP + 8]
+ 000001EB  E8 00000000 E     1		call	WriteString
+ 000001F0  5A		     1		pop		EDX
+
+ 000001F1			_printNumber:
+ 000001F1  B8 00000000			mov				EAX, 0
+ 000001F6  AD				LODSD
+ 000001F7  E8 00000000 E		call			WriteInt
+ 000001FC  B0 2C			mov				AL, ','
+ 000001FE  E8 00000000 E		call			WriteChar
+ 00000203  B0 20			mov				AL, ' '
+ 00000205  E8 00000000 E		call			WriteChar
+ 0000020A  E2 E5			loop			_printNumber
+
+ 0000020C  5D				pop				EBP
+ 0000020D  C2 0010			ret				16
+ 00000210			printOutput ENDP
 
 				END main
-Microsoft (R) Macro Assembler Version 14.29.30040.0	    08/08/21 11:03:06
+Microsoft (R) Macro Assembler Version 14.29.30040.0	    08/08/21 13:24:24
 <Project 6 - String Primitives and Macros     (Proj6_nolann.  Symbols 2 - 1
 
 
@@ -596,8 +646,8 @@ Segments and Groups:
 
 FLAT . . . . . . . . . . . . . .	GROUP
 STACK  . . . . . . . . . . . . .	32 Bit	 00001000 Para	  Stack	  'STACK'	 
-_DATA  . . . . . . . . . . . . .	32 Bit	 00000284 Para	  Public  'DATA'	
-_TEXT  . . . . . . . . . . . . .	32 Bit	 00000194 Para	  Public  'CODE'	
+_DATA  . . . . . . . . . . . . .	32 Bit	 0000023B Para	  Public  'DATA'	
+_TEXT  . . . . . . . . . . . . .	32 Bit	 00000210 Para	  Public  'CODE'	
 
 
 Procedures, parameters, and locals:
@@ -667,10 +717,13 @@ ReadInt  . . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External
 ReadKeyFlush . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 ReadKey  . . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 ReadString . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
-ReadVal  . . . . . . . . . . . .	P Near	 00000074 _TEXT	Length= 00000081 Public STDCALL
-  _nextCharacter . . . . . . . .	L Near	 000000C4 _TEXT	
-  _inputLengthError  . . . . . .	L Near	 000000E4 _TEXT	
-  _endRead . . . . . . . . . . .	L Near	 000000ED _TEXT	
+ReadVal  . . . . . . . . . . . .	P Near	 000000A1 _TEXT	Length= 000000E2 Public STDCALL
+  _nextCharacter . . . . . . . .	L Near	 000000FB _TEXT	
+  _saveToArray . . . . . . . . .	L Near	 00000119 _TEXT	
+  _addInteger  . . . . . . . . .	L Near	 00000131 _TEXT	
+  _multiplyBySignFlag  . . . . .	L Near	 00000158 _TEXT	
+  _inputLengthError  . . . . . .	L Near	 0000016E _TEXT	
+  _endRead . . . . . . . . . . .	L Near	 00000179 _TEXT	
 SetConsoleCursorInfo . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 SetConsoleCursorPosition . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 SetConsoleMode . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
@@ -707,25 +760,23 @@ WriteStackFrameName  . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External
 WriteStackFrame  . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 WriteString  . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 WriteToFile  . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
-WriteVal . . . . . . . . . . . .	P Near	 0000014E _TEXT	Length= 00000005 Public STDCALL
+WriteVal . . . . . . . . . . . .	P Near	 000001D7 _TEXT	Length= 00000005 Public STDCALL
 WriteWindowsMsg  . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
-clearString  . . . . . . . . . .	P Near	 00000149 _TEXT	Length= 00000005 Public STDCALL
-main . . . . . . . . . . . . . .	P Near	 00000000 _TEXT	Length= 00000074 Public STDCALL
-  _getUserInput  . . . . . . . .	L Near	 0000001E _TEXT	
-  _inputErrorMessage . . . . . .	L Near	 00000047 _TEXT	
-  _inputErrorMessageEnd  . . . .	L Near	 0000005F _TEXT	
-printInstructions  . . . . . . .	P Near	 00000170 _TEXT	Length= 00000013 Public STDCALL
-printIntroduction  . . . . . . .	P Near	 00000153 _TEXT	Length= 0000001D Public STDCALL
-printOutput  . . . . . . . . . .	P Near	 00000183 _TEXT	Length= 00000011 Public STDCALL
+main . . . . . . . . . . . . . .	P Near	 00000000 _TEXT	Length= 000000A1 Public STDCALL
+  _getUserInput  . . . . . . . .	L Near	 0000002E _TEXT	
+  _inputErrorMessage . . . . . .	L Near	 00000058 _TEXT	
+  _inputErrorMessageEnd  . . . .	L Near	 00000070 _TEXT	
+printOutput  . . . . . . . . . .	P Near	 000001DC _TEXT	Length= 00000034 Public STDCALL
+  _printNumber . . . . . . . . .	L Near	 000001F1 _TEXT	
 printf . . . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External C
 scanf  . . . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External C
-validateCharacter  . . . . . . .	P Near	 0000012A _TEXT	Length= 0000001F Public STDCALL
-  _error . . . . . . . . . . . .	L Near	 0000013C _TEXT	
-  _errorEnd  . . . . . . . . . .	L Near	 00000145 _TEXT	
-validateFirstCharacter . . . . .	P Near	 000000F5 _TEXT	Length= 00000035 Public STDCALL
-  _minusSign . . . . . . . . . .	L Near	 00000111 _TEXT	
-  _errorFirstChar  . . . . . . .	L Near	 0000011D _TEXT	
-  _errorFirstCharEnd . . . . . .	L Near	 00000126 _TEXT	
+validateCharacter  . . . . . . .	P Near	 000001B8 _TEXT	Length= 0000001F Public STDCALL
+  _error . . . . . . . . . . . .	L Near	 000001CA _TEXT	
+  _errorEnd  . . . . . . . . . .	L Near	 000001D3 _TEXT	
+validateFirstCharacter . . . . .	P Near	 00000183 _TEXT	Length= 00000035 Public STDCALL
+  _minusSign . . . . . . . . . .	L Near	 0000019F _TEXT	
+  _errorFirstChar  . . . . . . .	L Near	 000001AB _TEXT	
+  _errorFirstCharEnd . . . . . .	L Near	 000001B4 _TEXT	
 wsprintfA  . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External C
 
 
@@ -809,14 +860,14 @@ IDRETRY  . . . . . . . . . . . .	Number	 00000004h
 IDTIMEOUT  . . . . . . . . . . .	Number	 00007D00h   
 IDTRYAGAIN . . . . . . . . . . .	Number	 0000000Ah   
 IDYES  . . . . . . . . . . . . .	Number	 00000006h   
-INTEGER_COUNT  . . . . . . . . .	Number	 0000000Ah   
+INTEGER_COUNT  . . . . . . . . .	Number	 00000003h   
 INVALID_HANDLE_VALUE . . . . . .	Number	 -00000001h   
 KBDOWN_FLAG  . . . . . . . . . .	Number	 00000001h   
 KEY_EVENT  . . . . . . . . . . .	Number	 00000001h   
 KEY_MASKS  . . . . . . . . . . .	Number	 0000001Fh   
 LEFT_ALT_PRESSED . . . . . . . .	Number	 00000002h   
 LEFT_CTRL_PRESSED  . . . . . . .	Number	 00000008h   
-MAX_INPUT_LENGTH . . . . . . . .	Number	 00000064h   
+MAX_INPUT_LENGTH . . . . . . . .	Number	 0000000Fh   
 MB_ABORTRETRYIGNORE  . . . . . .	Number	 00000002h   
 MB_APPLMODAL . . . . . . . . . .	Number	 00000000h   
 MB_CANCELTRYCONTINUE . . . . . .	Number	 00000006h   
@@ -949,14 +1000,15 @@ blue . . . . . . . . . . . . . .	Number	 00000001h
 brown  . . . . . . . . . . . . .	Number	 00000006h   
 cyan . . . . . . . . . . . . . .	Number	 00000003h   
 exit . . . . . . . . . . . . . .	Text   	 INVOKE ExitProcess,0
-goodbye  . . . . . . . . . . . .	Byte	 00000255 _DATA	
+goodbye  . . . . . . . . . . . .	Byte	 0000020C _DATA	
 gray . . . . . . . . . . . . . .	Number	 00000008h   
 green  . . . . . . . . . . . . .	Number	 00000002h   
-inputErrorFlag . . . . . . . . .	DWord	 000001E8 _DATA	
+inputArray . . . . . . . . . . .	DWord	 0000019B _DATA	
+inputErrorFlag . . . . . . . . .	DWord	 00000193 _DATA	
 inputErrorMsg  . . . . . . . . .	Byte	 00000150 _DATA	
-inputLength  . . . . . . . . . .	DWord	 000001E4 _DATA	
+inputLength  . . . . . . . . . .	DWord	 0000018F _DATA	
 inputRequest . . . . . . . . . .	Byte	 00000130 _DATA	
-inputSign  . . . . . . . . . . .	DWord	 000001EC _DATA	
+inputSign  . . . . . . . . . . .	DWord	 00000197 _DATA	
 instruction1 . . . . . . . . . .	Byte	 0000003C _DATA	
 lightBlue  . . . . . . . . . . .	Number	 00000009h   
 lightCyan  . . . . . . . . . . .	Number	 0000000Bh   
@@ -965,9 +1017,9 @@ lightGreen . . . . . . . . . . .	Number	 0000000Ah
 lightMagenta . . . . . . . . . .	Number	 0000000Dh   
 lightRed . . . . . . . . . . . .	Number	 0000000Ch   
 magenta  . . . . . . . . . . . .	Number	 00000005h   
-outputAverage  . . . . . . . . .	Byte	 00000229 _DATA	
-outputNumbers  . . . . . . . . .	Byte	 000001F0 _DATA	
-outputSum  . . . . . . . . . . .	Byte	 0000020D _DATA	
+outputAverage  . . . . . . . . .	Byte	 000001E0 _DATA	
+outputNumbers  . . . . . . . . .	Byte	 000001A7 _DATA	
+outputSum  . . . . . . . . . . .	Byte	 000001C4 _DATA	
 programByline  . . . . . . . . .	Byte	 0000002B _DATA	
 programTitle . . . . . . . . . .	Byte	 00000000 _DATA	
 red  . . . . . . . . . . . . . .	Number	 00000004h   

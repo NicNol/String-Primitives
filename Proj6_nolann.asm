@@ -47,8 +47,8 @@ mDisplayString MACRO outputStringOffset
 ENDM
 
 ; Constants
-INTEGER_COUNT = 10
-MAX_INPUT_LENGTH = 100
+INTEGER_COUNT = 3
+MAX_INPUT_LENGTH = 15
 
 .data
 
@@ -72,6 +72,7 @@ userInput			BYTE	MAX_INPUT_LENGTH DUP(?)
 inputLength			DWORD	0
 inputErrorFlag		DWORD	0
 inputSign			SDWORD	1
+inputArray			SDWORD	INTEGER_COUNT DUP(?)
 
 ; Output String Identifiers
 outputNumbers		BYTE	"You entered these numbers:", 13, 10, 0
@@ -85,20 +86,20 @@ goodbye				BYTE	"Thank you for using my program. Hasta Luego!", 13, 10, 0
 main PROC
 	
 	; Print Introduction
-	push			offset programByline
-	push			offset programTitle
-	call			printIntroduction
+	mDisplayString	offset programTitle
+	mDisplayString	offset programByline
 
 	; Print Instructions
-	push			offset instruction1
-	call			printInstructions
+	mDisplayString	offset instruction1
 
-	; Get the required number of user inputs
+	; Set up our looping registers
 	mov				ECX, INTEGER_COUNT
+	mov				EDI, offset inputArray
 
 _getUserInput:
 	
 	; Solicit user input of signed integers
+	push			EDI
 	push			offset inputSign
 	push			offset inputErrorFlag
 	push			offset inputLength
@@ -119,11 +120,17 @@ _inputErrorMessage:
 
 _inputErrorMessageEnd:
 
+	; Move EDI pointer to next array index
+	add				EDI, type SDWORD				
+
 	loop			_getUserInput
 
-	; Convert inputs to SDWORD Array
-
 	; Display output (numbers, sum, and rounded average)
+	push			offset inputArray
+	push			offset outputAverage
+	push			offset outputSum
+	push			offset outputNumbers
+	call			printOutput
 
 	; Say goodbye
 	mDisplayString offset goodbye
@@ -131,16 +138,16 @@ _inputErrorMessageEnd:
 	Invoke ExitProcess,0	; exit to operating system
 main ENDP
 
-ReadVal PROC uses EAX ECX EDX ESI
+ReadVal PROC uses EAX EBX ECX EDX ESI EDI
 	push			EBP
 	mov				EBP, ESP
 
 	; Invoke the mGetString macro to get user input in the form of a string of digits
-	mGetString		[EBP + 24], [EBP + 28], MAX_INPUT_LENGTH, [EBP + 32]		; Parameters: inputPrompt, inputString, inputLengthLimit, InputLength
+	mGetString		[EBP + 32], [EBP + 36], MAX_INPUT_LENGTH, [EBP + 40]		; Parameters: inputPrompt, inputString, inputLengthLimit, InputLength
 
 	; Set up looping registers
-	mov				ESI, [EBP + 28]
-	mov				ECX, [EBP + 32]
+	mov				ESI, [EBP + 36]
+	mov				ECX, [EBP + 40]
 
 	; If no input or input too long, then raise error.
 	cmp				ECX, 0
@@ -148,19 +155,21 @@ ReadVal PROC uses EAX ECX EDX ESI
 	cmp				ECX, 12
 	jge				_inputLengthError
 
-	; Check first character for sign
+	; Reset EAX and load first ASCII character
 	mov				EAX, 0
 	cld
 	lodsb
-	push			[EBP + 40]								; inputSign offset
-	push			[EBP + 36]								; inputErrorFlag offset
+
+	; Check first character for sign
+	push			[EBP + 48]								; inputSign offset
+	push			[EBP + 44]								; inputErrorFlag offset
 	push			EAX
 	call			validateFirstCharacter
 	
 	; Decrement ECX and verify it is greater than zero before checking next characters
 	dec				ECX
 	cmp				ECX, 0
-	jle				_endRead
+	jle				_saveToArray
 
 _nextCharacter:
 
@@ -170,32 +179,89 @@ _nextCharacter:
 	lodsb													; load string byte into AL
 
 	; Validate ASCII character
-	push			[EBP + 36]								; inputError offset
+	push			[EBP + 44]								; inputError offset
 	push			EAX
 	call			validateCharacter
 	
 	; If character was invalid, break loop
 	mov				EAX, 0
-	mov				EDX, [EBP + 36]
+	mov				EDX, [EBP + 44]
 	cmp				EAX, [EDX]
 	jne				_endRead
 
 	loop			_nextCharacter
-	
-	; Store the value into a memory variable
-	
+
+_saveToArray:
+
+	; Set up registers
+	mov				ESI, [EBP + 36]					; Address of user input string
+	mov				EDI, [EBP + 52]					; Address of array index where result will go
+	mov				ECX, [EBP + 40]					; Length of string
+	mov				EBX, 0							; Starting value
+	mov				EDX, 1							; 10s place
+
+	; Set ESI to last character
+	mov				EAX, ECX
+	dec				EAX
+	add				ESI, EAX
+
+_addInteger:
+	; Reset EAX and load next ASCII character
+	mov				EAX, 0
+	std
+	lodsb
+
+	; If character is a sign, check next character
+	cmp				EAX, 2Bh		; + sign
+	je				_multiplyBySignFlag
+	cmp				EAX, 2Dh		; - sign
+	je				_multiplyBySignFlag
+
+	; Convert ASCII to hex integer value
+	sub				EAX, 30h
+
+	; Multiply by 10 ^ n
+	push			EDX
+	imul			EDX								; Result is stored in EDX:EAX
+	add				EBX, EAX
+
+	; Set up next cycle
+	pop				EDX
+	mov				EAX, EDX
+	mov				EDX, 10
+	imul			EDX
+	mov				EDX, EAX
+
+	loop			_addInteger
+
+_multiplyBySignFlag:
+
+	; Multiply by sign flag
+	mov				EAX, EBX
+	mov				EBX, [EBP + 48]					; sign (1 or -1)
+	mov				EBX, [EBX]
+	imul			EBX								; Result is stored in EDX:EAX
+
+	; Reset sign flag
+	mov				EBX, [EBP + 48]	
+	mov				sdword ptr [EBX], 1
+
+	; Save integer value to array
+	mov				[EDI], EAX
+
 	jmp				_endRead
 
 _inputLengthError:
 
 	; Set Error Flag
-	mov				EAX, [EBP + 36]
+	mov				EAX, [EBP + 44]
 	mov				DWORD ptr [EAX], 1
+	jmp				_endRead
 
 _endRead:
 
 	pop				EBP
-	ret				20
+	ret				24
 ReadVal ENDP
 
 validateFirstCharacter PROC
@@ -241,7 +307,6 @@ validateCharacter PROC
 	push			EBP
 	mov				EBP, ESP
 
-
 	; Move ASCII character to EAX
 	mov				EAX, [EBP + 8]
 
@@ -266,14 +331,6 @@ _errorEnd:
 	ret				8
 validateCharacter ENDP
 
-clearString PROC
-	push			EBP
-	mov				EBP, ESP
-
-	pop				EBP
-	ret		
-clearString ENDP
-
 WriteVal PROC
 	push			EBP
 	mov				EBP, ESP
@@ -282,38 +339,29 @@ WriteVal PROC
 	ret		
 WriteVal ENDP
 
-printIntroduction PROC uses EDX
-	push			EBP
-	mov				EBP, ESP
-
-	; Program Title
-	mDisplayString	[EBP + 12]
-
-	; Program Author
-	mDisplayString	[EBP + 16]
-
-	pop				EBP
-	ret				8
-printIntroduction ENDP
-
-printInstructions PROC uses EDX
-	push			EBP
-	mov				EBP, ESP
-
-	mDisplayString	[EBP + 12]
-
-	pop				EBP
-	ret				8
-printInstructions ENDP
-
 printOutput PROC
 	push			EBP
 	mov				EBP, ESP
 
+	; Set up registers
+	mov				ECX, INTEGER_COUNT
+	mov				ESI, [EBP + 20]
+
+	; Print Title for entered numbers
 	mDisplayString	[EBP + 8]
 
+_printNumber:
+	mov				EAX, 0
+	LODSD
+	call			WriteInt
+	mov				AL, ','
+	call			WriteChar
+	mov				AL, ' '
+	call			WriteChar
+	loop			_printNumber
+
 	pop				EBP
-	ret				8
+	ret				16
 printOutput ENDP
 
 END main
