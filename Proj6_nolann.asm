@@ -48,7 +48,7 @@ ENDM
 
 ; Constants
 INTEGER_COUNT = 10
-MAX_INPUT_LENGTH = 12 ; 11 characters plus terminating zero
+MAX_INPUT_LENGTH = 100
 
 .data
 
