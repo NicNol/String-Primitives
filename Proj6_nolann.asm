@@ -32,15 +32,30 @@ INCLUDE Irvine32.inc
 ;	inputString			: The user input is stored at the corresponding address offset.
 ;	inputStringLength	: The length of the user input is stored at the corresponding address offset.
 ; ---------------------------------------------------------------------------------
-mGetString MACRO inputPrompt, inputString, inputLengthLimit, inputStringLength
+mGetString MACRO inputPrompt, inputString, inputLengthLimit, inputStringLength, outputStringOffset, inputTotalString, inputTotal, inputNumber
 
 	; Save register values
 	push			EAX
 	push			ECX
 	push			EDX
 
+	; Print current total
+	call			CrLf
+	mDisplayString	inputTotalString
+	push			outputStringOffset
+	push			inputTotal
+	call			WriteVal
+	call			CrLf
+
 	; Print input prompt
-	mDisplayString inputPrompt
+	mDisplayString	inputPrompt
+	push			outputStringOffset
+	push			inputNumber
+	call			WriteVal
+	mov				AL, ':'
+	call			WriteChar
+	mov				AL, ' '
+	call			WriteChar
 
 	; Get and save user input
 	mov				EDX, inputString
@@ -82,7 +97,7 @@ mDisplayString MACRO outputStringOffset
 ENDM
 
 ; Constants
-INTEGER_COUNT = 3
+INTEGER_COUNT = 10
 MAX_INPUT_LENGTH = 15
 
 .data
@@ -97,7 +112,8 @@ instructions		BYTE	"Hello there. This program takes 10 signed integers from the 
 					BYTE	"Each integer must be in the range of -2147483647 to 2147483647 (1 signed 32-bit integer).",13, 10, 13, 10, 0
 
 ; Prompt Identifiers
-inputRequest		BYTE	"Please enter a signed integer: ", 0
+inputTotal			BYTE	"Current Total is: ", 0
+inputRequest		BYTE	"Please enter signed integer #", 0
 
 ; Error Identifiers
 inputErrorMsg		BYTE	"Error -- Please enter a valid signed integer.", 13, 10, 0
@@ -156,6 +172,10 @@ main PROC
 _getUserInput:
 	
 	; Solicit user input of signed integers
+	push			offset inputTotal
+	push			offset inputArray
+	push			ECX
+	push			offset outputString
 	push			offset inputErrorMsg
 	push			EDI
 	push			offset inputSign
@@ -220,6 +240,10 @@ main ENDP
 ;			[EBP + 48] -> Address offset of where the sign of user input should be saved.
 ;			[EBP + 52] -> Address offset of where the converted SDWORD value should be saved.
 ;			[EBP + 56] -> Address offset of input error message.
+;			[EBP + 60] -> Address offset of output string for WriteVal
+;			[EBP + 64] -> ECX value
+;			[EBP + 68] -> Address offset of input array
+;			[EBP + 72] -> Address offset of input total message
 ;
 ; Returns: The following data may be changed after this procedure:
 ;			[EBP + 36] -> Address offset of where user string input is saved.
@@ -234,8 +258,29 @@ ReadVal PROC uses EAX EBX ECX EDX ESI EDI
 
 _getInput:
 
+	; Calculate current input number
+	mov				EAX, INTEGER_COUNT
+	sub				EAX, [EBP + 64]
+	inc				EAX
+	push			EAX
+
+	; Calculate current sum
+	; Set up registers
+	mov				ECX, EAX
+	mov				ESI, [EBP + 68]
+	mov				EBX, 0								; Store Sum
+
+_sumNextInteger:
+	; Load next array value into EAX
+	mov				EAX, 0
+	cld
+	LODSD
+	add				EBX, EAX
+	loop			_sumNextInteger
+	pop				EAX
+
 	; Invoke the mGetString macro to get user input in the form of a string of digits
-	mGetString		[EBP + 32], [EBP + 36], MAX_INPUT_LENGTH, [EBP + 40]
+	mGetString		[EBP + 32], [EBP + 36], MAX_INPUT_LENGTH, [EBP + 40], [EBP + 60], [EBP + 72], EBX, EAX
 
 	; Validate the string
 	push			[EBP + 48]							; Address offset of sign
@@ -278,7 +323,7 @@ _errorMessage:
 _errorMessageEnd:
 
 	pop				EBP
-	ret				28
+	ret				44
 ReadVal ENDP
 
 ; --------------------------------------------------------------------------------- 
