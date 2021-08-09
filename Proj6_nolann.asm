@@ -27,25 +27,19 @@ INCLUDE Irvine32.inc
 ;	inputString			: Address offset where user input should be stored.
 ;	inputLengthLimit	: The number of bytes that should be captured during user input.
 ;	inputStringLength	: Address offset where the length of the user input should be stored.
-; 
+;	outputStringOffset	: Address offset of an output string for WriteVal.
+;	inputNumber			: The current input number. IE: Input #1, #2, etc.
+;
 ; Returns:
 ;	inputString			: The user input is stored at the corresponding address offset.
 ;	inputStringLength	: The length of the user input is stored at the corresponding address offset.
 ; ---------------------------------------------------------------------------------
-mGetString MACRO inputPrompt, inputString, inputLengthLimit, inputStringLength, outputStringOffset, inputTotalString, inputTotal, inputNumber
+mGetString MACRO inputPrompt, inputString, inputLengthLimit, inputStringLength, outputStringOffset, inputNumber
 
 	; Save register values
 	push			EAX
 	push			ECX
 	push			EDX
-
-	; Print current total
-	call			CrLf
-	mDisplayString	inputTotalString
-	push			outputStringOffset
-	push			inputTotal
-	call			WriteVal
-	call			CrLf
 
 	; Print input prompt
 	mDisplayString	inputPrompt
@@ -67,6 +61,35 @@ mGetString MACRO inputPrompt, inputString, inputLengthLimit, inputStringLength, 
 	pop				EDX
 	pop				ECX
 	pop				EAX
+
+ENDM
+
+; --------------------------------------------------------------------------------- 
+; Name: mPrintTotal
+; 
+; Description: Prints a message about the total and then the total value.
+;				Example: "The total is ##"
+; 
+; Preconditions: All arguments should be initialized.
+; 
+; Receives: 
+;	outputStringOffset	: Address offset of an output string for WriteVal.
+;	inputTotalString	: Address offset of a string to tell the user we are displaying the total.
+;	inputTotal			: The total value as a signed integer
+; 
+; Returns: The total message and total value is displayed in the console window.
+; ---------------------------------------------------------------------------------
+mPrintTotal MACRO outputStringOffset, inputTotalString, inputTotal
+
+	; Print total message
+	call			CrLf
+	mDisplayString	inputTotalString
+
+	; Print total value
+	push			outputStringOffset
+	push			inputTotal
+	call			WriteVal
+	call			CrLf
 
 ENDM
 
@@ -106,6 +129,9 @@ MAX_INPUT_LENGTH = 15
 programTitle		BYTE	"Project 6 - String Primitives and Macros", 13, 10, 0
 programByline		BYTE	"By Nic Nolan", 13, 10, 13, 10, 0
 
+; Extra Credit Identifers
+extraCredit1		BYTE	"Extra Credit #1: each line of user input is numbered, with a running total of the valid inputs.",13,10,13,10,0
+
 ; Instruction Identifiers
 instructions		BYTE	"Hello there. This program takes 10 signed integers from the user.", 13, 10
 					BYTE	"It then displays the integers, their sum, and the rounded average of the numbers.", 13, 10
@@ -140,11 +166,12 @@ main PROC
 ; ----------------------------------------------------
 ; PRINT INTRODUCTION
 ;
-;	Prints the project name and the author's name into
-;	the console window.
+;	Prints the project name, the author's name, and
+;	extra credit description into the console window.
 ; ---------------------------------------------------- 
 	mDisplayString	offset programTitle
 	mDisplayString	offset programByline
+	mDisplayString	offset extraCredit1
 
 ; ---------------------------------------------------- 
 ; PRINT INSTRUCTIONS
@@ -258,14 +285,21 @@ ReadVal PROC uses EAX EBX ECX EDX ESI EDI
 
 _getInput:
 
+	; ----------------------------------------------------  
+	; CALCULATE CURRENT SUM AND INPUT NUMBER
+	;
+	;	This section calculates what input number the user
+	;	is currently on, as well as the sum of the valid
+	;	numbers entered so far. [EXTRA CREDIT #1]
+	; ----------------------------------------------------
+
 	; Calculate current input number
 	mov				EAX, INTEGER_COUNT
 	sub				EAX, [EBP + 64]
 	inc				EAX
 	push			EAX
 
-	; Calculate current sum
-	; Set up registers
+	; Set up registers to calculate sum
 	mov				ECX, EAX
 	mov				ESI, [EBP + 68]
 	mov				EBX, 0								; Store Sum
@@ -279,8 +313,18 @@ _sumNextInteger:
 	loop			_sumNextInteger
 	pop				EAX
 
-	; Invoke the mGetString macro to get user input in the form of a string of digits
-	mGetString		[EBP + 32], [EBP + 36], MAX_INPUT_LENGTH, [EBP + 40], [EBP + 60], [EBP + 72], EBX, EAX
+	; ----------------------------------------------------  
+	; GET USER INPUT
+	;
+	;	This section prompts the user to input a valid
+	;	integer and validates the input. If an error is
+	;	detected, the user is returned to the top of the
+	;	procedure.
+	; ----------------------------------------------------
+
+	; Print current total and get user Input
+	mPrintTotal		[EBP + 60], [EBP + 72], EBX
+	mGetString		[EBP + 32], [EBP + 36], MAX_INPUT_LENGTH, [EBP + 40], [EBP + 60], EAX
 
 	; Validate the string
 	push			[EBP + 48]							; Address offset of sign
@@ -294,6 +338,14 @@ _sumNextInteger:
 	mov				EAX, [EAX]
 	cmp				EAX, 0
 	jne				_errorMessage
+
+	; ----------------------------------------------------  
+	; CONVERT USER INPUT
+	;
+	;	This section converts the user's input from a string
+	;	value to an integer value. If an error is detected,
+	;	the user is returned to the top of the procedure.
+	; ----------------------------------------------------
 
 	; Save the input as a SDWORD
 	push			[EBP + 52]							; Address offset of where SDWORD should be saved
@@ -656,21 +708,21 @@ _negativeNumber:
 	mov				EAX, '-'
 	STOSB			
 
-; ---------------------------------------------------- 
-; GET AND SAVE LEADING DIGIT OF INTEGER INPUT
-;
-;	This section does the following:
-;
-;	1. Gets the leading digit of the integer input.
-;
-;	2. Converts the leading digit to ASCII.
-;
-;	3. Saves the ASCII character as a BYTE to the output string.
-;
-;	4. The remainder becomes the new input.
-;
-;	5. Repeat steps 1 - 4 until we reach the end of the integer.
-; ----------------------------------------------------
+	; ---------------------------------------------------- 
+	; GET AND SAVE LEADING DIGIT OF INTEGER INPUT
+	;
+	;	This section does the following:
+	;
+	;	1. Gets the leading digit of the integer input.
+	;
+	;	2. Converts the leading digit to ASCII.
+	;
+	;	3. Saves the ASCII character as a BYTE to the output string.
+	;
+	;	4. The remainder becomes the new input.
+	;
+	;	5. Repeat steps 1 - 4 until we reach the end of the integer.
+	; ----------------------------------------------------
 _getChar:
 	
 	; Get leading digit
@@ -692,17 +744,17 @@ _getChar:
 	push			EBX
 	mov				EAX, [EBP + 32]
 
-; ---------------------------------------------------- 
-; CHECK FOR NON-ZERO DIGIT IN OUTPUT STRING
-;
-;	Because we are dividing the integer input by a large
-;	number each time, inputs that are less than 10
-;	digits in length would have leading zeros if we
-;	input them normally. IE: 123 --> 0000000123.
-;
-;	This is undesirable, so we ensure that a digit has
-;	been recorded to the output before we add any zeros.
-; ----------------------------------------------------
+	; ---------------------------------------------------- 
+	; CHECK FOR NON-ZERO DIGIT IN OUTPUT STRING
+	;
+	;	Because we are dividing the integer input by a large
+	;	number each time, inputs that are less than 10
+	;	digits in length would have leading zeros if we
+	;	input them normally. IE: 123 --> 0000000123.
+	;
+	;	This is undesirable, so we ensure that a digit has
+	;	been recorded to the output before we add any zeros.
+	; ----------------------------------------------------
 _checkNextChar:
 
 	; See if a character previously written to output is non-zero
@@ -716,12 +768,12 @@ _checkNextChar:
 	jle				_leadingZero
 	jmp				_checkNextChar
 
-; ---------------------------------------------------- 
-; QUOTIENT IS A LEADING ZERO
-;
-;	When the quotient is a leading zero, we only need
-;	to restore our registers and skip the saving step.
-; ----------------------------------------------------
+	; ---------------------------------------------------- 
+	; QUOTIENT IS A LEADING ZERO
+	;
+	;	When the quotient is a leading zero, we only need
+	;	to restore our registers and skip the saving step.
+	; ----------------------------------------------------
 _leadingZero:
 
 	; Restore registers
@@ -730,12 +782,12 @@ _leadingZero:
 
 	jmp				_saveCharEnd
 
-; ---------------------------------------------------- 
-; QUOTIENT IS A NON-LEADING ZERO
-;
-;	When the quotient is a non-leading zero, we restore
-;	our registers and then follow the normal save step.
-; ----------------------------------------------------
+	; ---------------------------------------------------- 
+	; QUOTIENT IS A NON-LEADING ZERO
+	;
+	;	When the quotient is a non-leading zero, we restore
+	;	our registers and then follow the normal save step.
+	; ----------------------------------------------------
 _nonLeadingZero:
 
 	; Restore registers
