@@ -47,7 +47,7 @@ mDisplayString MACRO outputStringOffset
 ENDM
 
 ; Constants
-INTEGER_COUNT = 3
+INTEGER_COUNT = 10
 MAX_INPUT_LENGTH = 15
 
 .data
@@ -74,10 +74,11 @@ inputErrorFlag		DWORD	0
 inputSign			SDWORD	1
 inputArray			SDWORD	INTEGER_COUNT DUP(?)
 
-; Output String Identifiers
+; Output Identifiers
 outputNumbers		BYTE	"You entered these numbers:", 13, 10, 0
 outputSum			BYTE	"The sum of the numbers is: ", 0
 outputAverage		BYTE	"The rounded average of all the numbers is: ", 0
+outputString		BYTE	MAX_INPUT_LENGTH DUP(?)
 
 ; Goodbye Identifiers
 goodbye				BYTE	"Thank you for using my program. Hasta Luego!", 13, 10, 0
@@ -126,6 +127,7 @@ _inputErrorMessageEnd:
 	loop			_getUserInput
 
 	; Display output (numbers, sum, and rounded average)
+	push			offset outputString
 	push			offset inputArray
 	push			offset outputAverage
 	push			offset outputSum
@@ -342,15 +344,105 @@ _errorEnd:
 	ret				8
 validateCharacter ENDP
 
-WriteVal PROC
+WriteVal PROC uses EAX EBX ECX EDX EDI
 	push			EBP
 	mov				EBP, ESP
 
-	mov				EAX, [EBP + 8]
-	call			WriteInt
+	; Set up registers
+	mov				EDX, [EBP + 28]							; Integer value to convert to string
+	mov				EDI, [EBP + 32]							; Output Array
+	mov				ECX, 10									; Maximum number of loops required
+	mov				EBX, 1000000000							; Greatest possible divisor 10 ^ 9
+
+	cmp				EAX, 0
+	jl				_negativeNumber
+	jmp				_getChar
+
+_negativeNumber:
+
+	neg				EDX
+	mov				EAX, '-'
+	STOSB			
+
+_getChar:
+	
+	; Get leading digit
+	mov				EAX, EDX
+	cdq
+	div				EBX										; Quotient = EAX. Remainder = EDX.
+	
+	; Save remainder
+	push			EDX
+
+	; If leading digit is zero, ensure it is not the first recorded digit
+	cmp				EAX, 0
+	jne				_saveChar
+	push			EAX
+	push			EBX
+	mov				EAX, [EBP + 32]
+
+_checkNextChar:
+
+	; See if character written to output is non-zero
+	mov				BL, BYTE PTR [EAX]
+	cmp				BL, 31h
+	jge				_nonLeadingZero
+
+	; If not, check next character
+	inc				EAX
+	cmp				EDI, EAX
+	jle				_leadingZero
+	jmp				_checkNextChar
+
+_leadingZero:
+
+	; Restore registers
+	pop				EBX
+	pop				EAX
+
+	jmp				_saveCharEnd
+
+_nonLeadingZero:
+
+	; Restore registers
+	pop				EBX
+	pop				EAX
+
+_saveChar:
+
+	; Save digit to output array
+	add				EAX, 30h
+	STOSB
+
+_saveCharEnd:
+
+	; Divide EBX (integer divisor) by 10
+	mov				EAX, EBX
+	cdq
+	mov				EBX, 10
+	div				EBX
+	mov				EBX, EAX
+
+	; Restore remainder 
+	pop				EDX
+
+	loop _getChar
+
+	; Terminate string
+	mov			EAX, 0
+	STOSB
+
+	; Display output string
+	mDisplayString	[EBP + 32]
+
+	; Clear output string
+	mov				ECX, MAX_INPUT_LENGTH
+	mov				EDI, [EBP + 32]
+	mov				EAX, 0
+	rep				STOSB
 
 	pop				EBP
-	ret				4
+	ret				8
 WriteVal ENDP
 
 printOutput PROC uses EAX EBX ECX EDX ESI
@@ -371,7 +463,8 @@ _printNumber:
 	LODSD
 
 	; Write number value as a string
-	push			EAX
+	push			[EBP + 44]							; Output string offset
+	push			EAX									; Integer Value to convert to string
 	call			WriteVal
 
 	; Unless we're on the last number, print a comma and a space between numbers
@@ -404,7 +497,8 @@ _sumNext:
 
 	; Display Sum
 	mov				EAX, EBX
-	push			EAX
+	push			[EBP + 44]							; Output string offset
+	push			EAX									; Integer Value to convert to string
 	call			WriteVal
 
 _calculateAverage:
@@ -420,7 +514,8 @@ _calculateAverage:
 	mDisplayString	[EBP + 36]
 
 	; Display Average
-	push			EAX
+	push			[EBP + 44]							; Output string offset
+	push			EAX									; Integer Value to convert to string
 	call			WriteVal
 
 	pop				EBP
