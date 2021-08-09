@@ -1,14 +1,37 @@
 TITLE Project 6 - String Primitives and Macros     (Proj6_nolann.asm)
 
 ; Author: Nic Nolan
-; Last Modified: 08/04/2021
+; Last Modified: 08/09/2021
 ; OSU email address: nolann@oregonstate.edu
 ; Course number/section:   CS271 Section 400
 ; Project Number: #6                Due Date: 08/13/2021
-; Description: 
+; Description: This progam does the following:
+;	1) Requests 10 user-inputted signed-integers (32 bit signed max). Invalid integers require
+;		the user to input a new signed integer until the input is valid.
+;	2) Prints the 10 valid numbers the user entered.
+;	3) Calculates and prints the sum of the 10 numbers.
+;	4) Calculates and prints the rounded average of the 10 numbers.
+;	5) Says goodbye to the user.
 
 INCLUDE Irvine32.inc
 
+; --------------------------------------------------------------------------------- 
+; Name: mGetString 
+; 
+; Description: Prints an input prompt and gets input from the user.
+; 
+; Preconditions: All arguments should be initialized.
+; 
+; Receives: 
+;	inputPrompt			: Address offset of a string requesting user input.
+;	inputString			: Address offset where user input should be stored.
+;	inputLengthLimit	: The number of bytes that should be captured during user input.
+;	inputStringLength	: Address offset where the length of the user input should be stored.
+; 
+; Returns:
+;	inputString			: The user input is stored at the corresponding address offset.
+;	inputStringLength	: The length of the user input is stored at the corresponding address offset.
+; ---------------------------------------------------------------------------------
 mGetString MACRO inputPrompt, inputString, inputLengthLimit, inputStringLength
 
 	; Save register values
@@ -19,7 +42,7 @@ mGetString MACRO inputPrompt, inputString, inputLengthLimit, inputStringLength
 	; Print input prompt
 	mDisplayString inputPrompt
 
-	; Get user input as string
+	; Get and save user input
 	mov		EDX, inputString
 	mov		ECX, inputLengthLimit
 	call	ReadString						; Returns: EAX = Number of characters entered.
@@ -32,6 +55,18 @@ mGetString MACRO inputPrompt, inputString, inputLengthLimit, inputStringLength
 
 ENDM
 
+; --------------------------------------------------------------------------------- 
+; Name: mDisplayString 
+; 
+; Description: Prints the argument string into the console window.
+; 
+; Preconditions: The argument string should be initialized.
+; 
+; Receives: 
+;	outputStringOffset	: Address offset of string to be printed.
+; 
+; Returns: The string is printed into the console window.
+; ---------------------------------------------------------------------------------
 mDisplayString MACRO outputStringOffset
 
 	; Save register values
@@ -57,7 +92,7 @@ programTitle		BYTE	"Project 6 - String Primitives and Macros", 13, 10, 0
 programByline		BYTE	"By Nic Nolan", 13, 10, 13, 10, 0
 
 ; Instruction Identifiers
-instruction1		BYTE	"Hello there. This program takes 10 signed integers from the user.", 13, 10
+instructions		BYTE	"Hello there. This program takes 10 signed integers from the user.", 13, 10
 					BYTE	"It then displays the integers, their sum, and the rounded average of the numbers.", 13, 10
 					BYTE	"Each integer must be in the range of -2147483648 to 2147483647 (1 signed 32-bit integer).",13, 10, 13, 10, 0
 
@@ -85,21 +120,43 @@ goodbye				BYTE	"Thank you for using my program. Hasta Luego!", 13, 10, 0
 
 .code
 main PROC
-	
-	; Print Introduction
+
+; ----------------------------------------------------
+; PRINT INTRODUCTION
+;
+;	Prints the project name and the author's name into
+;	the console window.
+; ---------------------------------------------------- 
 	mDisplayString	offset programTitle
 	mDisplayString	offset programByline
 
-	; Print Instructions
-	mDisplayString	offset instruction1
+; ---------------------------------------------------- 
+; PRINT INSTRUCTIONS
+;
+;	Prints the project instructions into the console
+;	window.
+; ---------------------------------------------------- 
+	mDisplayString	offset instructions
 
-	; Set up our looping registers
+; ----------------------------------------------------  
+; GET USER INPUT
+;
+;	This section prompts the user to input valid integers.
+;	If the user input is valid, it will continue requesting
+;	until INTEGER_COUNT of integers have been recorded.
+;
+;	If the user input is invalid, the user will be prompted
+;	to re-enter another integer until the input is valid.
+; ----------------------------------------------------
+
+	; Set up looping registers
 	mov				ECX, INTEGER_COUNT
 	mov				EDI, offset inputArray
 
 _getUserInput:
 	
 	; Solicit user input of signed integers
+	push			offset inputErrorMsg
 	push			EDI
 	push			offset inputSign
 	push			offset inputErrorFlag
@@ -108,25 +165,24 @@ _getUserInput:
 	push			offset inputRequest
 	call			ReadVal
 
-	; If invalid input, print error and retry
-	cmp				inputErrorFlag, 0
-	jne				_inputErrorMessage
-	jmp				_inputErrorMessageEnd
-
-_inputErrorMessage:
-
-	mDisplayString	offset inputErrorMsg
-	mov				inputErrorFlag, 0
-	jmp				_getUserInput
-
-_inputErrorMessageEnd:
-
 	; Move EDI pointer to next array index
 	add				EDI, type SDWORD				
 
 	loop			_getUserInput
 
-	; Display output (numbers, sum, and rounded average)
+; ---------------------------------------------------- 
+; DISPLAY OUTPUT
+;
+;	This section does the following:
+;
+;	1. Prints each of the numbers entered by the user.
+;
+;	2. Calculate and prints the sum of the numbers
+;		entered by the user.
+;
+;	3. Calculate and prints the rounded average of the
+;		numbers entered by the user.
+; ----------------------------------------------------
 	push			offset outputString
 	push			offset inputArray
 	push			offset outputAverage
@@ -134,7 +190,11 @@ _inputErrorMessageEnd:
 	push			offset outputNumbers
 	call			printOutput
 
-	; Say goodbye
+; ----------------------------------------------------
+; SAY GOODBYE
+;
+;	Prints the goodbye message into the console window.
+; ----------------------------------------------------
 	call			CrLf
 	call			CrLf
 	mDisplayString	offset goodbye
@@ -142,58 +202,65 @@ _inputErrorMessageEnd:
 	Invoke ExitProcess,0	; exit to operating system
 main ENDP
 
+; --------------------------------------------------------------------------------- 
+; Name: ReadVal 
+;  
+; Description: This procedure prompts the user to input integers. Valid integers are
+;				converted from strings to their SDWORD equivalents and saved to an
+;				address location. 
+; 
+; Preconditions: Argument addresses should be valid. Data at addresses should be initialized.
+; 
+; Postconditions: Registers are restored after procedure call.
+; 
+; Receives: [EBP + 32] -> Address offset of input request prompt.
+;			[EBP + 36] -> Address offset of where user string input should be saved.
+;			[EBP + 40] -> Address offset of where the user input string length should be saved.
+;			[EBP + 44] -> Address offset of where the input error flag should be saved.
+;			[EBP + 48] -> Address offset of where the sign of user input should be saved.
+;			[EBP + 52] -> Address offset of where the converted SDWORD value should be saved.
+;			[EBP + 56] -> Address offset of input error message.
+;
+; Returns: The following data may be changed after this procedure:
+;			[EBP + 36] -> Address offset of where user string input is saved.
+;			[EBP + 40] -> Address offset of where the user input string length is saved.
+;			[EBP + 44] -> Address offset of where the input error flag is saved.
+;			[EBP + 48] -> Address offset of where the sign of user input is saved.
+;			[EBP + 52] -> Address offset of where the converted SDWORD value is saved.
+; ---------------------------------------------------------------------------------
 ReadVal PROC uses EAX EBX ECX EDX ESI EDI
 	push			EBP
 	mov				EBP, ESP
 
+_getInput:
+
 	; Invoke the mGetString macro to get user input in the form of a string of digits
 	mGetString		[EBP + 32], [EBP + 36], MAX_INPUT_LENGTH, [EBP + 40]		; Parameters: inputPrompt, inputString, inputLengthLimit, InputLength
 
-	; Set up looping registers
-	mov				ESI, [EBP + 36]
-	mov				ECX, [EBP + 40]
+	; Validate the string
+	push			[EBP + 48]						; Address offset of sign
+	push			[EBP + 44]						; Address offset of error flag
+	push			[EBP + 40]						; Address offset of input string length
+	push			[EBP + 36]						; Address offset of input string
+	call			validateString
 
-	; If no input or input too long, then raise error.
-	cmp				ECX, 0
-	jle				_inputLengthError
-	cmp				ECX, 12
-	jge				_inputLengthError
+	; If invalid input, print error and retry
+	mov				EAX, [EBP + 44]
+	mov				EAX, [EAX]
+	cmp				EAX, 0
+	jnz				_inputErrorMessage
+	jmp				_inputErrorMessageEnd
 
-	; Reset EAX and load first ASCII character
-	mov				EAX, 0
-	cld
-	lodsb
+_inputErrorMessage:
 
-	; Check first character for sign
-	push			[EBP + 48]								; inputSign offset
-	push			[EBP + 44]								; inputErrorFlag offset
-	push			EAX
-	call			validateFirstCharacter
-	
-	; Decrement ECX and verify it is greater than zero before checking next characters
-	dec				ECX
-	cmp				ECX, 0
-	jle				_saveToArray
+	mDisplayString	[EBP + 56]
+	mov				EAX, [EBP + 44]
+	mov				DWORD ptr [EAX], 0				; Reset error flag
+	jmp				_getInput
 
-_nextCharacter:
+_inputErrorMessageEnd:
 
-	; Reset EAX and load next ASCII character
-	mov				EAX, 0
-	cld
-	lodsb													; load string byte into AL
-
-	; Validate ASCII character
-	push			[EBP + 44]								; inputError offset
-	push			EAX
-	call			validateCharacter
-	
-	; If character was invalid, break loop
-	mov				EAX, 0
-	mov				EDX, [EBP + 44]
-	cmp				EAX, [EDX]
-	jne				_endRead
-
-	loop			_nextCharacter
+	; Save the input as a SDWORD
 
 _saveToArray:
 
@@ -260,29 +327,131 @@ _multiplyBySignFlag:
 
 _overflowError:
 
-	; Fix stack and then use _inputLengthError to set flag
+	; Fix stack
 	pop				EDX
-	jmp				_inputLengthError
-
-_inputLengthError:
 
 	; Set Error Flag
 	mov				EAX, [EBP + 44]
 	mov				DWORD ptr [EAX], 1
+
 	jmp				_endRead
 
 _endRead:
 
 	pop				EBP
-	ret				24
+	ret				28
 ReadVal ENDP
 
-validateFirstCharacter PROC
+; --------------------------------------------------------------------------------- 
+; Name: validateString
+;  
+; Description: This procedure prompts the user to input integers. Valid integers are
+;				converted from strings to their SDWORD equivalents and saved to an
+;				address location. 
+; 
+; Preconditions: Argument addresses should be valid. Data at addresses should be initialized.
+; 
+; Postconditions: Registers are restored after procedure call.
+; 
+; Receives: 
+;			[EBP + 24] -> Address offset of where user string input is saved.
+;			[EBP + 28] -> Address offset of where the user input string length is saved.
+;			[EBP + 32] -> Address offset of where the input error flag should be saved.
+;			[EBP + 36] -> Address offset of where the sign of user input should be saved.
+;
+; Returns: The following data may be changed after this procedure:
+;			[EBP + 32] -> Address offset of where the input error flag is saved.
+;			[EBP + 36] -> Address offset of where the sign of user input is saved.
+; ---------------------------------------------------------------------------------
+validateString PROC uses EAX ECX EDX ESI
+	push			EBP
+	mov				EBP, ESP
+
+	; Set up looping registers
+	mov				ESI, [EBP + 24]							; Input string address
+	mov				ECX, [EBP + 28]							; Input string length
+
+	; If no input or input too long, then raise error.
+	cmp				ECX, 0
+	jle				_inputLengthError
+	cmp				ECX, 12
+	jge				_inputLengthError
+
+	; Reset EAX and load first ASCII character
+	mov				EAX, 0
+	cld
+	lodsb
+
+	; Check first character for sign
+	push			[EBP + 36]								; inputSign offset
+	push			[EBP + 32]								; inputErrorFlag offset
+	push			EAX
+	call			validateFirstCharacter
+	
+	; Decrement ECX and verify it is greater than zero before checking next characters
+	dec				ECX
+	cmp				ECX, 0
+	jle				_validateEnd
+
+_nextCharacter:
+
+	; Reset EAX and load next ASCII character
+	mov				EAX, 0
+	cld
+	lodsb													; load string byte into AL
+
+	; Validate ASCII character
+	push			[EBP + 32]								; inputError offset
+	push			EAX
+	call			validateCharacter
+	
+	; If character was invalid, break loop
+	mov				EAX, 0
+	mov				EDX, [EBP + 32]
+	cmp				EAX, [EDX]
+	jne				_validateEnd
+
+	loop			_nextCharacter
+	
+	jmp				_validateEnd
+
+_inputLengthError:
+
+	; Set Error Flag
+	mov				EAX, [EBP + 32]
+	mov				DWORD ptr [EAX], 1
+
+_validateEnd:
+
+	pop				EBP
+	ret				16
+validateString ENDP
+
+
+; --------------------------------------------------------------------------------- 
+; Name: validateFirstCharacter 
+;  
+; Description: This procedure validates the first character of a user string input.
+;				It allows characters that are +, -, or numerical inputs (in ASCII).
+; 
+; Preconditions: Argument addresses should be valid. Data at addresses should be initialized.
+; 
+; Postconditions: Registers are restored after procedure call.
+; 
+; Receives: [EBP + 16] -> ASCII character byte (hexadecimal)
+;			[EBP + 20] -> Address offset of where the input error flag should be saved.
+;			[EBP + 24] -> Address offset of where the sign of the user input should be saved.
+;
+; Returns: The following data may be changed after this procedure:
+;			[EBP + 20] -> Address offset of where the input error flag is saved.
+;			[EBP + 24] -> Address offset of where the sign of the user input is saved.
+; ---------------------------------------------------------------------------------
+validateFirstCharacter PROC uses EAX EDX
 	push			EBP
 	mov				EBP, ESP
 
 	; Move ASCII character to EAX
-	mov				EAX, [EBP + 8]
+	mov				EAX, [EBP + 16]
 
 	; Check if character is a plus or minus sign
 	cmp				EAX, 2Bh		; + sign
@@ -300,14 +469,14 @@ validateFirstCharacter PROC
 _minusSign:
 
 	; Store the negative sign
-	mov				EAX, [EBP + 16]
+	mov				EAX, [EBP + 24]
 	mov				EDX, -1
 	mov				[EAX], EDX
 	jmp				_errorFirstCharEnd
 
 _errorFirstChar:
 	
-	mov				EAX, [EBP + 12]
+	mov				EAX, [EBP + 20]
 	mov				DWORD ptr [EAX], 1		; Set error flag
 
 _errorFirstCharEnd:
@@ -316,17 +485,32 @@ _errorFirstCharEnd:
 	ret				12
 validateFirstCharacter ENDP
 
-validateCharacter PROC
+; --------------------------------------------------------------------------------- 
+; Name: validateCharacter 
+;  
+; Description: This procedure validates a character of a user string input.
+;				It allows characters that are numerical inputs (in ASCII).
+; 
+; Preconditions: Argument addresses should be valid. Data at addresses should be initialized.
+; 
+; Postconditions: Registers are restored after procedure call.
+; 
+; Receives: [EBP + 12] -> ASCII character byte (hexadecimal)
+;			[EBP + 16] -> Address offset of where the input error flag should be saved.
+;
+; Returns: The following data may be changed after this procedure:
+;			[EBP + 16] -> Address offset of where the input error flag is saved.
+; ---------------------------------------------------------------------------------
+validateCharacter PROC uses EAX
 	push			EBP
 	mov				EBP, ESP
 
 	; Move ASCII character to EAX
-	mov				EAX, [EBP + 8]
+	mov				EAX, [EBP + 12]
 
 	; Check if character is in the range of 48 [0] to 57 [9]
 	cmp				EAX, 30h
 	jb				_error
-
 	cmp				EAX, 39h
 	ja				_error
 
@@ -335,8 +519,9 @@ validateCharacter PROC
 
 _error:
 
-	mov				EAX, [EBP + 12]
-	mov				DWORD ptr [EAX], 1		; Set error flag
+	; Set error flag
+	mov				EAX, [EBP + 16]
+	mov				DWORD ptr [EAX], 1		
 
 _errorEnd:
 
@@ -344,6 +529,22 @@ _errorEnd:
 	ret				8
 validateCharacter ENDP
 
+; --------------------------------------------------------------------------------- 
+; Name: WriteVal 
+;  
+; Description: This procedure converts signed double word (SDWORD) integer values to
+;				strings and prints them to the console.
+; 
+; Preconditions: Argument addresses should be valid. Data at addresses should be initialized.
+; 
+; Postconditions: Registers are restored after procedure call.
+; 
+; Receives: [EBP + 28] -> SDWORD value to convert to string
+;			[EBP + 32] -> Address offset of where output string should be saved.
+;
+; Returns: The following data may be changed after this procedure:
+;			[EBP + 32] -> Address offset of where output string is saved.
+; ---------------------------------------------------------------------------------
 WriteVal PROC uses EAX EBX ECX EDX EDI
 	push			EBP
 	mov				EBP, ESP
@@ -445,6 +646,26 @@ _saveCharEnd:
 	ret				8
 WriteVal ENDP
 
+; --------------------------------------------------------------------------------- 
+; Name: printOutput 
+;  
+; Description: This procedure prints each of the numbers in the argument array. It
+;				then calculates and prints the sum of the numbers, as well as the
+;				rounded average of the numbers.
+; 
+; Preconditions: Argument addresses should be valid.
+; 
+; Postconditions: Registers are restored after procedure call. Data at addresses should be initialized.
+; 
+; Receives: [EBP + 28] -> Address offset of title for entered numbers ("You entered these numbers: ").
+;			[EBP + 32] -> Address offset of title for sum of numbers ("The sum is: ").
+;			[EBP + 36] -> Address offset of title for average of numbers ("The average is: ").
+;			[EBP + 40] -> Address offset of the array of numbers to be displayed, summed, and averaged.
+;			[EBP + 44] -> Address offset of where each output string should be saved.
+;
+; Returns: The following data may be changed after this procedure:
+;			[EBP + 44] -> Address offset of where each output string should be saved.
+; ---------------------------------------------------------------------------------
 printOutput PROC uses EAX EBX ECX EDX ESI
 	push			EBP
 	mov				EBP, ESP
