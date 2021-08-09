@@ -35,23 +35,23 @@ INCLUDE Irvine32.inc
 mGetString MACRO inputPrompt, inputString, inputLengthLimit, inputStringLength
 
 	; Save register values
-	push	EAX
-	push	ECX
-	push	EDX
+	push			EAX
+	push			ECX
+	push			EDX
 
 	; Print input prompt
 	mDisplayString inputPrompt
 
 	; Get and save user input
-	mov		EDX, inputString
-	mov		ECX, inputLengthLimit
-	call	ReadString						; Returns: EAX = Number of characters entered.
-	mov		inputStringLength, EAX
+	mov				EDX, inputString
+	mov				ECX, inputLengthLimit
+	call			ReadString					; Returns: EAX = Number of characters entered.
+	mov				inputStringLength, EAX
 
 	; Restore register values
-	pop		EDX
-	pop		ECX
-	pop		EAX
+	pop				EDX
+	pop				ECX
+	pop				EAX
 
 ENDM
 
@@ -70,14 +70,14 @@ ENDM
 mDisplayString MACRO outputStringOffset
 
 	; Save register values
-	push	EDX
+	push			EDX
 
 	; Print string
-	mov		EDX, outputStringOffset
-	call	WriteString
+	mov				EDX, outputStringOffset
+	call			WriteString
 
 	; Restore register values
-	pop		EDX
+	pop				EDX
 
 ENDM
 
@@ -611,6 +611,21 @@ _negativeNumber:
 	mov				EAX, '-'
 	STOSB			
 
+; ---------------------------------------------------- 
+; GET AND SAVE LEADING DIGIT OF INTEGER INPUT
+;
+;	This section does the following:
+;
+;	1. Gets the leading digit of the integer input.
+;
+;	2. Converts the leading digit to ASCII.
+;
+;	3. Saves the ASCII character as a BYTE to the output string.
+;
+;	4. The remainder becomes the new input.
+;
+;	5. Repeat steps 1 - 4 until we reach the end of the integer.
+; ----------------------------------------------------
 _getChar:
 	
 	; Get leading digit
@@ -632,6 +647,17 @@ _getChar:
 	push			EBX
 	mov				EAX, [EBP + 32]
 
+; ---------------------------------------------------- 
+; CHECK FOR NON-ZERO DIGIT IN OUTPUT STRING
+;
+;	Because we are dividing the integer input by a large
+;	number each time, inputs that are less than 10
+;	digits in length would have leading zeros if we
+;	input them normally. IE: 123 --> 0000000123.
+;
+;	This is undesirable, so we ensure that a digit has
+;	been recorded to the output before we add any zeros.
+; ----------------------------------------------------
 _checkNextChar:
 
 	; See if a character previously written to output is non-zero
@@ -645,6 +671,12 @@ _checkNextChar:
 	jle				_leadingZero
 	jmp				_checkNextChar
 
+; ---------------------------------------------------- 
+; QUOTIENT IS A LEADING ZERO
+;
+;	When the quotient is a leading zero, we only need
+;	to restore our registers and skip the saving step.
+; ----------------------------------------------------
 _leadingZero:
 
 	; Restore registers
@@ -653,6 +685,12 @@ _leadingZero:
 
 	jmp				_saveCharEnd
 
+; ---------------------------------------------------- 
+; QUOTIENT IS A NON-LEADING ZERO
+;
+;	When the quotient is a non-leading zero, we restore
+;	our registers and then follow the normal save step.
+; ----------------------------------------------------
 _nonLeadingZero:
 
 	; Restore registers
