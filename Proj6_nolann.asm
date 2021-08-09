@@ -82,7 +82,7 @@ mDisplayString MACRO outputStringOffset
 ENDM
 
 ; Constants
-INTEGER_COUNT = 10
+INTEGER_COUNT = 3
 MAX_INPUT_LENGTH = 15
 
 .data
@@ -94,7 +94,7 @@ programByline		BYTE	"By Nic Nolan", 13, 10, 13, 10, 0
 ; Instruction Identifiers
 instructions		BYTE	"Hello there. This program takes 10 signed integers from the user.", 13, 10
 					BYTE	"It then displays the integers, their sum, and the rounded average of the numbers.", 13, 10
-					BYTE	"Each integer must be in the range of -2147483648 to 2147483647 (1 signed 32-bit integer).",13, 10, 13, 10, 0
+					BYTE	"Each integer must be in the range of -2147483647 to 2147483647 (1 signed 32-bit integer).",13, 10, 13, 10, 0
 
 ; Prompt Identifiers
 inputRequest		BYTE	"Please enter a signed integer: ", 0
@@ -235,108 +235,47 @@ ReadVal PROC uses EAX EBX ECX EDX ESI EDI
 _getInput:
 
 	; Invoke the mGetString macro to get user input in the form of a string of digits
-	mGetString		[EBP + 32], [EBP + 36], MAX_INPUT_LENGTH, [EBP + 40]		; Parameters: inputPrompt, inputString, inputLengthLimit, InputLength
+	mGetString		[EBP + 32], [EBP + 36], MAX_INPUT_LENGTH, [EBP + 40]
 
 	; Validate the string
-	push			[EBP + 48]						; Address offset of sign
-	push			[EBP + 44]						; Address offset of error flag
-	push			[EBP + 40]						; Address offset of input string length
-	push			[EBP + 36]						; Address offset of input string
+	push			[EBP + 48]							; Address offset of sign
+	push			[EBP + 44]							; Address offset of error flag
+	push			[EBP + 40]							; Address offset of input string length
+	push			[EBP + 36]							; Address offset of input string
 	call			validateString
 
 	; If invalid input, print error and retry
 	mov				EAX, [EBP + 44]
 	mov				EAX, [EAX]
 	cmp				EAX, 0
-	jnz				_inputErrorMessage
-	jmp				_inputErrorMessageEnd
-
-_inputErrorMessage:
-
-	mDisplayString	[EBP + 56]
-	mov				EAX, [EBP + 44]
-	mov				DWORD ptr [EAX], 0				; Reset error flag
-	jmp				_getInput
-
-_inputErrorMessageEnd:
+	jne				_errorMessage
 
 	; Save the input as a SDWORD
+	push			[EBP + 52]							; Address offset of where SDWORD should be saved
+	push			[EBP + 48]							; Address offset of sign
+	push			[EBP + 44]							; Address offset of error flag
+	push			[EBP + 40]							; Address offset of input string length
+	push			[EBP + 36]							; Address offset of input string
+	call			stringToSDWORD
 
-_saveToArray:
-
-	; Set up registers
-	mov				ESI, [EBP + 36]					; Address of user input string
-	mov				EDI, [EBP + 52]					; Address of array index where result will go
-	mov				ECX, [EBP + 40]					; Length of string
-	mov				EBX, 0							; Starting value
-	mov				EDX, 1							; 10s place
-
-	; Set ESI to last character
-	mov				EAX, ECX
-	dec				EAX
-	add				ESI, EAX
-
-_addInteger:
-	; Reset EAX and load next ASCII character
-	mov				EAX, 0
-	std
-	lodsb
-
-	; If character is a sign, check next character
-	cmp				EAX, 2Bh		; + sign
-	je				_multiplyBySignFlag
-	cmp				EAX, 2Dh		; - sign
-	je				_multiplyBySignFlag
-
-	; Convert ASCII to hex integer value
-	sub				EAX, 30h
-
-	; Multiply by 10 ^ n
-	push			EDX
-	imul			EDX								; Result is stored in EDX:EAX
-	add				EBX, EAX
-
-	; Jump to error if overflow
-	jo				_overflowError
-
-	; Set up next cycle
-	pop				EDX
-	mov				EAX, EDX
-	mov				EDX, 10
-	imul			EDX
-	mov				EDX, EAX
-
-	loop			_addInteger
-
-_multiplyBySignFlag:
-
-	; Multiply by sign flag
-	mov				EAX, EBX
-	mov				EBX, [EBP + 48]					; sign (1 or -1)
-	mov				EBX, [EBX]
-	imul			EBX								; Result is stored in EDX:EAX
-
-	; Reset sign flag
-	mov				EBX, [EBP + 48]	
-	mov				sdword ptr [EBX], 1
-
-	; Save integer value to array
-	mov				[EDI], EAX
-
-	jmp				_endRead
-
-_overflowError:
-
-	; Fix stack
-	pop				EDX
-
-	; Set Error Flag
+	; Check there is no overflow error
 	mov				EAX, [EBP + 44]
-	mov				DWORD ptr [EAX], 1
+	mov				EAX, [EAX]
+	cmp				EAX, 0
+	je				_errorMessageEnd
 
-	jmp				_endRead
+_errorMessage:
 
-_endRead:
+	; Display error message
+	mDisplayString	[EBP + 56]
+
+	; Reset error flag
+	mov				EAX, [EBP + 44]
+	mov				DWORD ptr [EAX], 0
+
+	jmp				_getInput
+
+_errorMessageEnd:
 
 	pop				EBP
 	ret				28
@@ -345,9 +284,8 @@ ReadVal ENDP
 ; --------------------------------------------------------------------------------- 
 ; Name: validateString
 ;  
-; Description: This procedure prompts the user to input integers. Valid integers are
-;				converted from strings to their SDWORD equivalents and saved to an
-;				address location. 
+; Description: This procedure checks each character in the argument string to ensure
+;				it is valid. If it is not, the error flag is set.
 ; 
 ; Preconditions: Argument addresses should be valid. Data at addresses should be initialized.
 ; 
@@ -368,8 +306,8 @@ validateString PROC uses EAX ECX EDX ESI
 	mov				EBP, ESP
 
 	; Set up looping registers
-	mov				ESI, [EBP + 24]							; Input string address
-	mov				ECX, [EBP + 28]							; Input string length
+	mov				ESI, [EBP + 24]						; Input string address
+	mov				ECX, [EBP + 28]						; Input string length
 
 	; If no input or input too long, then raise error.
 	cmp				ECX, 0
@@ -383,8 +321,8 @@ validateString PROC uses EAX ECX EDX ESI
 	lodsb
 
 	; Check first character for sign
-	push			[EBP + 36]								; inputSign offset
-	push			[EBP + 32]								; inputErrorFlag offset
+	push			[EBP + 36]							; inputSign offset
+	push			[EBP + 32]							; inputErrorFlag offset
 	push			EAX
 	call			validateFirstCharacter
 	
@@ -398,10 +336,10 @@ _nextCharacter:
 	; Reset EAX and load next ASCII character
 	mov				EAX, 0
 	cld
-	lodsb													; load string byte into AL
+	lodsb												; load string byte into AL
 
 	; Validate ASCII character
-	push			[EBP + 32]								; inputError offset
+	push			[EBP + 32]							; inputError offset
 	push			EAX
 	call			validateCharacter
 	
@@ -427,12 +365,13 @@ _validateEnd:
 	ret				16
 validateString ENDP
 
-
 ; --------------------------------------------------------------------------------- 
 ; Name: validateFirstCharacter 
 ;  
 ; Description: This procedure validates the first character of a user string input.
 ;				It allows characters that are +, -, or numerical inputs (in ASCII).
+;				If the character is not valid, the error flag is set.
+;				If a negative sign is found, the sign flag is set to -1.
 ; 
 ; Preconditions: Argument addresses should be valid. Data at addresses should be initialized.
 ; 
@@ -468,7 +407,7 @@ validateFirstCharacter PROC uses EAX EDX
 
 _minusSign:
 
-	; Store the negative sign
+	; Set the sign flag to -1
 	mov				EAX, [EBP + 24]
 	mov				EDX, -1
 	mov				[EAX], EDX
@@ -476,8 +415,9 @@ _minusSign:
 
 _errorFirstChar:
 	
+	; Set error flag
 	mov				EAX, [EBP + 20]
-	mov				DWORD ptr [EAX], 1		; Set error flag
+	mov				DWORD ptr [EAX], 1
 
 _errorFirstCharEnd:
 
@@ -490,6 +430,7 @@ validateFirstCharacter ENDP
 ;  
 ; Description: This procedure validates a character of a user string input.
 ;				It allows characters that are numerical inputs (in ASCII).
+;				If the character is not valid, the error flag is set.
 ; 
 ; Preconditions: Argument addresses should be valid. Data at addresses should be initialized.
 ; 
@@ -530,6 +471,107 @@ _errorEnd:
 validateCharacter ENDP
 
 ; --------------------------------------------------------------------------------- 
+; Name: stringToSDWORD 
+;  
+; Description: This procedure converts a string to a signed double word (SDWORD) value.
+;				If the value is too large, the error flag is set.
+; 
+; Preconditions: Argument addresses should be valid. Data at addresses should be initialized.
+; 
+; Postconditions: Registers are restored after procedure call.
+; 
+; Receives:
+;			[EBP + 32] -> Address offset of where user string input should be saved.
+;			[EBP + 36] -> Address offset of where the user input string length should be saved.
+;			[EBP + 40] -> Address offset of where the input error flag should be saved.
+;			[EBP + 44] -> Address offset of where the sign of user input should be saved.
+;			[EBP + 48] -> Address offset of where the converted SDWORD value should be saved.
+;
+; Returns: The following data may be changed after this procedure:
+;			[EBP + 40] -> Address offset of where the input error flag is saved.
+;			[EBP + 48] -> Address offset of where the converted SDWORD value is saved.
+; ---------------------------------------------------------------------------------
+stringToSDWORD PROC uses EAX EBX ECX EDX ESI EDI
+	push			EBP
+	mov				EBP, ESP
+
+	; Set up registers
+	mov				ESI, [EBP + 32]						; Address of user input string
+	mov				EDI, [EBP + 48]						; Address of array index where result will go
+	mov				ECX, [EBP + 36]						; Length of string
+	mov				EBX, 0								; Starting value
+	mov				EDX, 1								; 10s place
+
+	; Set ESI to last character
+	mov				EAX, ECX
+	dec				EAX
+	add				ESI, EAX
+
+_addInteger:
+	; Reset EAX and load next ASCII character
+	mov				EAX, 0
+	std
+	lodsb
+
+	; If character is a sign, we are at the end of the string.
+	cmp				EAX, 2Bh		; + sign
+	je				_multiplyBySignFlag
+	cmp				EAX, 2Dh		; - sign
+	je				_multiplyBySignFlag
+
+	; Convert ASCII to hex integer value
+	sub				EAX, 30h
+
+	; Multiply integer value by 10 ^ n
+	push			EDX
+	imul			EDX									; Result is stored in EDX:EAX
+	add				EBX, EAX
+
+	; Jump to error if overflow
+	jo				_overflowError
+
+	; Set up next cycle
+	pop				EDX
+	mov				EAX, EDX
+	mov				EDX, 10
+	imul			EDX
+	mov				EDX, EAX
+
+	loop			_addInteger
+
+_multiplyBySignFlag:
+
+	; Multiply final integer by its sign flag
+	mov				EAX, EBX
+	mov				EBX, [EBP + 44]						; sign (1 or -1)
+	mov				EBX, [EBX]
+	imul			EBX									; Result is stored in EDX:EAX
+
+	; Reset sign flag
+	mov				EBX, [EBP + 44]	
+	mov				sdword ptr [EBX], 1
+
+	; Save integer value to array
+	mov				[EDI], EAX
+
+	jmp				_stringToSDWORDEnd
+
+_overflowError:
+
+	; Fix stack
+	pop				EDX
+
+	; Set Error Flag
+	mov				EAX, [EBP + 40]
+	mov				DWORD ptr [EAX], 1
+
+_stringToSDWORDEnd:
+
+	pop				EBP
+	ret				20
+stringToSDWORD ENDP
+
+; --------------------------------------------------------------------------------- 
 ; Name: WriteVal 
 ;  
 ; Description: This procedure converts signed double word (SDWORD) integer values to
@@ -550,18 +592,22 @@ WriteVal PROC uses EAX EBX ECX EDX EDI
 	mov				EBP, ESP
 
 	; Set up registers
-	mov				EDX, [EBP + 28]							; Integer value to convert to string
-	mov				EDI, [EBP + 32]							; Output Array
-	mov				ECX, 10									; Maximum number of loops required
-	mov				EBX, 1000000000							; Greatest possible divisor 10 ^ 9
+	mov				EDX, [EBP + 28]						; Integer value to convert to string
+	mov				EDI, [EBP + 32]						; Output Array
+	mov				ECX, 10								; Maximum number of loops required
+	mov				EBX, 1000000000						; Greatest possible divisor 10 ^ 9
 
-	cmp				EAX, 0
+	; Check if SDWORD is a negative number
+	cmp				EDX, 0
 	jl				_negativeNumber
 	jmp				_getChar
 
 _negativeNumber:
-
+	
+	; Convert integer to twos complement
 	neg				EDX
+
+	; Save first output character as a minus symbol
 	mov				EAX, '-'
 	STOSB			
 
@@ -570,21 +616,25 @@ _getChar:
 	; Get leading digit
 	mov				EAX, EDX
 	cdq
-	div				EBX										; Quotient = EAX. Remainder = EDX.
+	div				EBX									; Quotient = EAX. Remainder = EDX.
 	
 	; Save remainder
 	push			EDX
 
-	; If leading digit is zero, ensure it is not the first recorded digit
+	; If leading digit is not zero, or it is the last digit, we always save it.
 	cmp				EAX, 0
 	jne				_saveChar
+	cmp				ECX, 1
+	je				_saveChar
+
+	; Otherwise, prepare to check if there are other recorded digits before we save the zero
 	push			EAX
 	push			EBX
 	mov				EAX, [EBP + 32]
 
 _checkNextChar:
 
-	; See if character written to output is non-zero
+	; See if a character previously written to output is non-zero
 	mov				BL, BYTE PTR [EAX]
 	cmp				BL, 31h
 	jge				_nonLeadingZero
@@ -627,10 +677,10 @@ _saveCharEnd:
 	; Restore remainder 
 	pop				EDX
 
-	loop _getChar
+	loop			_getChar
 
 	; Terminate string
-	mov			EAX, 0
+	mov				EAX, 0
 	STOSB
 
 	; Display output string
