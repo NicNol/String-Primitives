@@ -1,4 +1,4 @@
-# String Primatives
+# String Primitives
 
 This is the final project for a course on computer architecture and assembly language. It was programmed using x86 Microsoft Macro Assembler (MASM). 
 
